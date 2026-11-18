@@ -7,13 +7,14 @@ departs from it).
 
 ## Status
 
-**v0.1.0, local only, 2026-11-16.** `OXBOW=… tools/verify.sh` passes on this Mac (Apple
+**v0.1.0, 2026-11-16; public at `github.com/stoatworks-labs/woofer` from 2026-11-18.**
+`OXBOW=… tools/verify.sh` passes on this Mac (Apple
 Silicon, macOS 26) against a fresh universal Release build: every check at 1280x720 and
 320x180, six on Apple's software renderer, `--offline` with no GL context, the pipe, 19 of 19
 negative controls, 17 of 17 mutants, 19 of 19 controls alive in the sweep, oxbow reading and
 rendering the bundle with devices disabled. **Never loaded into Resolume; no live audio device
-ever opened**, by woofer or by earshot. No remote, nothing released, not on the website.
-earshot is a snapshot of `~/dev/earshot` at `8124191`, unpatched.
+ever opened**, by woofer or by earshot.
+earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `8124191`, unpatched.
 
 ## The idea
 
@@ -29,7 +30,7 @@ lit as a heightfield. Audio drives the mechanism, never a parameter wobble.
 - **Identity.** `SW Woofer`, `WF01`, effect, `com.stoatworks.ffgl.woofer`, harness `wftest`.
   One plugin, the About block last.
 - **earshot, snapshotted, not a submodule.** `external/earshot/` is `git archive 8124191` of
-  the local-only `~/dev/earshot`, with `SNAPSHOT` saying so and "Patches: none". Configured
+  earshot (`github.com/stoatworks-labs/earshot`), with `SNAPSHOT` saying so and "Patches: none". Configured
   with `tapRate = 32000`, `maxChannels = 2`, four bands with edges {20, 200, 800, 3200, 12800}
   Hz (used only by the fallback: under the Linear law bin 0, centred on 172 Hz, lands in the
   first band; earshot's default 30–150 Hz band gets no bin at all).
@@ -94,9 +95,9 @@ lit as a heightfield. Audio drives the mechanism, never a parameter wobble.
   tap in a frame.
 - **Defaults** (below) moved from the spec's after Resolume's clips: Drive +6 → +18 dB,
   Ambient 0.35 → 0.2, Gloss 0.5 → 0.85.
-- **No `.github/workflows/`.** CLAUDE.md: Actions only on public repos, and this one has no
-  remote and no visibility yet. fountain ships an unrun `ci.yml` headed "delete if private";
-  woofer ships none, so nothing can run by accident.
+- **Workflows only once public.** CLAUDE.md: Actions only on public repos. Until it was public
+  woofer shipped none, so nothing could run by accident; `ci.yml` and `release.yml` came with
+  the public repo (mirrorball's CI and filings' release, with mirrorball's `wincheck.ps1`).
 - **The `massless` negative control of the spec is `lightCone` in code**, and it is not
   massless: Mms × 1e-2 (fc ten times higher). Mms × 1e-5 blew RK4 up (see the traps).
 - **`--pumping` asks for 1000×, not the spec's 100×**: the real model's worst is 8 559.

@@ -62,8 +62,8 @@ without stretching, and the whole front is lit as a heightfield.
 
 ## Where the audio comes from
 
-From an audio input, through [earshot](external/earshot/README.md), the fleet's live-audio
-front end (a snapshot of commit `8124191`, unmodified). Pick the input in **Audio Input**: it
+From an audio input, through [earshot](https://github.com/stoatworks-labs/earshot), the fleet's
+live-audio front end ([a snapshot](external/earshot/SNAPSHOT) of commit `8124191`, unmodified). Pick the input in **Audio Input**: it
 is remembered by name, so a composition reopened on another day finds the same device, and a
 device that has gone shows as missing rather than quietly becoming another one. **Rescan
 Inputs** lists what is plugged in now. The device is opened off the render thread.
@@ -121,8 +121,8 @@ the baffle, unlit.
 
 ## Status
 
-**v0.1.0, local only, 16 November 2026. Never loaded into Resolume; no live audio device ever
-opened.**
+**v0.1.0, 16 November 2026; public from 18 November 2026. Never loaded into Resolume; no live
+audio device ever opened.**
 
 ### Measured offline, on macOS
 

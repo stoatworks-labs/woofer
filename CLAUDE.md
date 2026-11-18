@@ -5,7 +5,7 @@ one FFGL effect: a real driver's Thiele–Small parameters in a sealed box, volt
 audio waveform from earshot and integrated at 32 kHz, Bl(x), a stiffening suspension, an
 adiabatic air spring, the stop at Xmech and four breakup modes; the front drawn as a lit
 heightfield through a pinhole. C++/GLSL, CMake MODULE → universal `.bundle` (macOS) + Windows
-`.dll` (never built). MIT.
+`.dll` (built on GitHub's Windows runner). MIT. Public: `github.com/stoatworks-labs/woofer`.
 
 | id | display name | bundle | type |
 | --- | --- | --- | --- |
@@ -80,15 +80,20 @@ Read `AGENTS.md` before touching the integrator (`DriverModel::Run`), Bl(x) and 
 - `woofer_core` is an OBJECT library: the plugin registers itself from a file-scope
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
-- `external/earshot/` is a snapshot of `~/dev/earshot` at `8124191`, unpatched (`SNAPSHOT`).
-  Never edit it here; change earshot upstream and take a new snapshot.
+- `external/earshot/` is a snapshot of earshot (`github.com/stoatworks-labs/earshot`) at
+  `8124191`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
+  snapshot. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines and all.
 - **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide) and
   `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend, `sync-about.py`
   and `sync-attributions.py` generate them; edit them there then.
-- **No `.github/workflows/`, on purpose.** GitHub Actions only on a public repo, and this one
-  has no remote. Add CI only once it is public.
-- Local only: `~/dev/woofer`, no remote, nothing released, not on the website, never loaded
-  into Resolume. The spec is `~/Projects/resolume/specs/SPEC-woofer.md`.
+- **CI** (`.github/workflows/ci.yml`): macOS builds arm64 with the tools and runs `--list`,
+  `--offline` and `glslc`; Windows builds the DLL with MSVC and loads it as a host does
+  (`tools/wincheck.ps1`, whose `-Params` changes whenever a control or the About block does).
+  `release.yml` builds the universal bundle and the DLL with their zips, `.dmg` and installer;
+  dispatched by hand it builds without publishing, and a `v*` tag publishes. Actions only
+  because the repo is public: a private copy must never enable them.
+- Checkout: `~/Projects/resolume/woofer`, public at `github.com/stoatworks-labs/woofer`. The
+  spec is `~/Projects/resolume/specs/SPEC-woofer.md`.
 
 ## Diagnostics
 
