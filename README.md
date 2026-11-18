@@ -1,8 +1,10 @@
 # woofer
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. **It has never been loaded into
-> Resolume, and it has never opened a live audio device.** What's established is established
+> (Anthropic), directed and reviewed by a human author. **It has run in Resolume only briefly,
+> on one layer over a still (Arena 7.29.0 on a Mac, 7.27.1 on Windows), where Resolume's own
+> FFT did not move the cone, and it has never opened a live audio device: the cone has never
+> moved to music inside Resolume.** What's established is established
 > by an offline harness, `wftest`, that drives the real plugin class through the same
 > `ProcessOpenGL` a host calls, in a headless GL context on a synthetic clock, on this Mac's GPU
 > at two rasters, and feeds it audio through the same earshot `feed()` path a device would use.
@@ -83,7 +85,8 @@ and the drift all still act; but **it cannot show the music's waveform** (two ki
 different pitch look the same), **its level is not calibrated** (nobody has measured what
 Resolume's bins hold; **FFT Law** chooses how to read them), and **it steps once a frame**, so
 unlike the audio-input path it depends on the frame rate. The lamp is **amber** whenever the
-fallback is driving.
+fallback is driving. **In Arena 7.29.0 on a Mac it did not move the cone at all**: see
+[In Resolume](#in-resolume).
 
 The status lamp, a small LED below and right of the driver: **green** an input is delivering;
 **amber** Resolume's FFT; **blinking red** the chosen input is missing or failed (the FFT
@@ -121,13 +124,13 @@ the baffle, unlit.
 
 ## Status
 
-**v0.1.0, 16 November 2026; public from 18 November 2026. Never loaded into Resolume; no live
-audio device ever opened.**
+**v0.1.0, 18 November 2026. Run in Resolume only briefly, on one layer over a still; Resolume's
+FFT did not move the cone there, and no live audio device has ever been opened.**
 
 ### Measured offline, on macOS
 
 `tools/verify.sh` passes on this machine (Apple Silicon, macOS 26) against a fresh universal
-Release build (16 November 2026). Every check below runs at **two rasters**, 1280×720 and
+Release build (18 November 2026). Every check below runs at **two rasters**, 1280×720 and
 320×180, and the picture checks again on **Apple's software renderer** at 320×180. Audio is
 synthetic, fed through earshot's `feed()`; the device menu runs on earshot's scripted capture
 backend. **No step opens or lists a real audio device.**
@@ -157,16 +160,53 @@ backend. **No step opens or lists a real audio device.**
 
 Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
 
+### In Resolume
+
+- **Arena 7.29.0 on an Apple Silicon Mac**, with the release workflow's universal bundle (signed
+  ad hoc), mounted over Arena's REST API in a new composition, on one layer over a white still,
+  with the Audio buffer on Composition and Audio Input on None (host FFT): it registers as
+  `SW Woofer` / `WF01`, an effect, with all 28 parameters shown (Opacity and the 27 declared);
+  at rest the frame holds still and the lamp is amber (Resolume's FFT); Mix 0 is identical to
+  the still.
+- **Value or index: value.** Choosing a "(none)" spare slot (the 14th entry, whose value is 0,
+  the same as None (host FFT)'s) reads back as None (host FFT), index 0; the plugin did nothing
+  (no `audio input:` line in the log, the lamp still amber), where an index would have reached it
+  as 13 and blinked the lamp red; and the composition saved to a scratch copy writes no Audio
+  Input value at all (it was at its default, 0), while Driver and Channel are written as their
+  values (`value="2"`, `value="1"`). So Arena hands the plugin, and keeps, the entry's value,
+  which for a device is its name key. No real device was chosen.
+- **Resolume's FFT gave the fallback nothing.** With Arena's demo clip Beat 001 playing on the
+  layer below (its transport running), the Height view's dust cap stayed on the rest code, under
+  half a per cent of Xmech, for 40 snapshots under each of the four FFT Laws, the same as with
+  nothing playing, and the Lit view did not change between snapshots, in two runs. Whether
+  Arena's spectrum was empty on that Mac's audio set-up or too small to move the cone at
+  +18 dB was not found out; nothing in the plugin was changed for it.
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
+  the release workflow built from this source: the fleet's Arena gate passed 9 checks, failed none and
+  skipped 2. It loads, registers as `WF01`, an effect, shows all 28 controls with the declared
+  name, order, type, range and default, renders, and 10 controls move a still cone's picture.
+  The 11 that act only on a moving cone are skipped there (no sound device), and Rescan Inputs
+  and Status Lamp (an LED too small for the gate's thumbnail) are recorded inert. Arena's log
+  was clean and it survived the run. The MSVC build of woofer and of earshot has no warnings,
+  and `tools/wincheck.ps1` loads the DLL as a host does and reads back its 27 parameters.
+- It has never been in a show, and nothing was timed inside Resolume.
+
 ### Not established
 
-- **No host has loaded it.** Not Arena, not Avenue, on any platform; no sound from Resolume has
-  reached it. `oxbow` (the fleet's test host) reads the bundle and renders through it, with
-  devices disabled, which is all.
+- **The cone has never moved to music inside Resolume.** Resolume's FFT did not move it in
+  Arena on the Mac (above), and Avenue has never loaded it.
 - **No live audio device** has been opened, by woofer or by earshot. The device menu, the
   states and the lamp are proved on a scripted backend.
-- **Windows** has never been built, and MSVC has never compiled earshot.
 - **The fallback is uncalibrated.** At the default Drive a band level of 1 in Resolume's FFT
-  drives the cone onto the stop; what level real music gives there is unknown.
+  drives the cone onto the stop; what level real music gives there is unknown. A band level
+  above 1 is taken as 1, and under the two Linear laws the bass band (the 63 Hz sine) reads a
+  single bin, Resolume's lowest.
+- **The audio analysis costs CPU it does not use**: about 0.5 ms a frame on the render thread
+  (onsets, pitch and tempo, which woofer never reads), with no switch in this version.
+- **The Height view can flash** with loud music: over three flashes a second over large areas
+  on 5 to 10 of Resolume's 33 demo clips with a master at about −11 dBFS RMS or hotter. The Lit
+  view, the default, added no flash to any clip at any Drive. The [user
+  guide](https://stoatworks-labs.com/software/woofer/guide/#flashing) has the table.
 - **Chosen, not measured:** the cone's profile and the dust cap's and surround's shapes, the
   suspension's stiffening (no datasheet gives Kms(x)), the stop's restitution (0.3), the fringe
   field's width, the breakup modes (read by eye off the response plots; their shapes and
@@ -175,7 +215,8 @@ Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
   self-shadowing, sound out.
 - The defaults were chosen over seven of Resolume's bundled clips through `--pipe`, with their
   own soundtracks and a mix of them mastered to −12 dBFS, looked at as stills, not in a show.
-- No user guide, no presets, no OpenFX port and no browser demo.
+- No presets and no OpenFX port. The [user guide](https://stoatworks-labs.com/software/woofer/guide/)
+  is `docs/USER-GUIDE.md`.
 
 ## Browser demo
 

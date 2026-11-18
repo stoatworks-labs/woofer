@@ -19,8 +19,8 @@ Read `AGENTS.md` before touching the integrator (`DriverModel::Run`), Bl(x) and 
 - Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release`
 - Fast dev build: add `-DCMAKE_OSX_ARCHITECTURES=arm64`
 - Build: `cmake --build build -j8`
-- Install to Resolume: `cmake --install build`. Never from a shared session on this Mac:
-  nothing here has been loaded into Arena.
+- Install to Resolume: `cmake --install build`. Never from a shared session on this Mac: Arena
+  here runs Allan's show, and the fleet's agents take turns through the `arena-mac` lock.
 - Render offline: `./build/wftest --out /tmp/w.png` (the defaults on the harness's card, fed
   its track of kicks, hats and a 55 Hz bass through earshot's `feed()`, 3 s in); the summary
   line gives the driver, x now, max |x| against Xmech and the stop hits

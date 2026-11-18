@@ -7,13 +7,17 @@ departs from it).
 
 ## Status
 
-**v0.1.0, 2026-11-16; public at `github.com/stoatworks-labs/woofer` from 2026-11-18.**
+**v0.1.0, released 2026-11-18, public at `github.com/stoatworks-labs/woofer`.**
 `OXBOW=… tools/verify.sh` passes on this Mac (Apple
 Silicon, macOS 26) against a fresh universal Release build: every check at 1280x720 and
 320x180, six on Apple's software renderer, `--offline` with no GL context, the pipe, 19 of 19
 negative controls, 17 of 17 mutants, 19 of 19 controls alive in the sweep, oxbow reading and
-rendering the bundle with devices disabled. **Never loaded into Resolume; no live audio device
-ever opened**, by woofer or by earshot.
+rendering the bundle with devices disabled. **In Resolume only briefly** (2026-11-18): Arena
+7.29.0 on this Mac over REST (registers, 28 parameters, Mix 0 is the still; Audio Input is a
+value, not an index; Resolume's Composition FFT did not move the cone at all with Beat 001
+playing, under every FFT Law, twice) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
+0 failed, 2 skipped; `plugin-bench/arena/expect/woofer.json`). README "In Resolume" has the
+detail. **No live audio device ever opened**, by woofer or by earshot.
 earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `8124191`, unpatched.
 
 ## The idea
@@ -235,8 +239,10 @@ side; the breakup modes' frequencies (read by eye off response plots), shapes, Q
 participation; B&C's Xmech (23 mm, not printed); the bare materials' reflectances; that
 Resolume's FFT levels are anywhere near 0..1 for music.
 
-Not done: loading it into Resolume; a live device; a Windows build (MSVC has never compiled
-woofer or earshot); a user guide, presets, an OpenFX port, a browser demo.
+Not done: a live device; music moving the cone inside Resolume (its FFT gave the fallback
+nothing on this Mac, cause not found); presets, an OpenFX port. Windows is built by CI (MSVC,
+no warnings in woofer or earshot) and gated in Arena on win-lab; the user guide is
+docs/USER-GUIDE.md and the browser demo is demo/.
 
 ## Would this hold on another rasteriser, at another raster?
 
