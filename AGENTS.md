@@ -323,3 +323,125 @@ more clearly. Audio Input and Rescan Inputs are not swept (no device may be touc
   still in fountain; whether either repo is ever public is Allan's call.
 - **Registration.** The About headers and ATTRIBUTIONS.md are hand copies until woofer is in
   the website's projects.json and stoatworks-backend.
+
+## Browser demo
+
+https://woofer-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed by
+`wrangler.toml` (a Worker route: the zone is at Cloudflare's 100 custom domains, so
+`woofer-demo` is a proxied AAAA `100::` record made through the API) and
+`.github/workflows/deploy.yml` on every push to main. mirrorball's and fountain's pattern.
+
+- **It runs the plugin, it doesn't port it.** `demo/woofer-core.wasm` is `Woofer.cpp` and
+  everything it calls (Driver, Profile, Audio, Controls, Shaders, Diag), earshot's snapshot
+  (every `src/*.cpp` but `Miniaudio.cpp`/`MiniaudioImpl.cpp`, with `NoCapture.cpp`: its own
+  `EARSHOT_CAPTURE=OFF` build, so the module has no device backend at all) and the FFGL SDK's
+  plugin classes, FFGLLog, FFGLShader and FFGLUtilities, compiled unmodified by emscripten
+  (`demo/tools/build-wasm.sh`). The integrator, the profile table, the fallback and earshot's
+  resampler and tap are that C++. Left out: `PluginEntry.cpp`. The script fails if a
+  `source/*.cpp` or an earshot `src/*.cpp` it doesn't list appears.
+- **What is the page's**: `demo/wasm/glue.cpp` plays the host (constructs the plugin, reads
+  its declarations back through the SDK so the panel is built from them, forwards
+  SetFloatParameter, SetTime, the Audio buffer's elements and ProcessOpenGL as wftest's rig
+  does, and hands the page the harness's accessors: the driver's model, x, max |x|, Xlin,
+  Xmech, stop hits, samples a frame, earshot's state, the plugin's clock);
+  `demo/wasm/gl_shim.cpp` takes glShaderSource (refusing any text that isn't byte for byte the
+  page's assembly of `demo/shaders.js`, then the kit's `port()`) and
+  glEnable/glDisable/glIsEnabled (GL_PROGRAM_POINT_SIZE, which WebGL2 lacks); the host row; the
+  read-outs' units, tooltips, the eleven presets (in dB, factors, seconds and degrees, through
+  the plugin's own inverses via `wf_param_from`), the line under the picture and Diag's log
+  from emscripten's memory file system (`WOOFER_LOG_DIR=/woofer/logs`). Off the panel: Audio
+  Input, Rescan Inputs, the Audio buffer and the About block (the panel's note says so).
+- **The audio, never a device.** The page never calls a device API (`check_shaders.py` fails if
+  a served file names getUserMedia, enumerateDevices or mediaDevices), the module cannot open
+  one, and `wf_prepare` sets `WOOFER_NO_DEVICES=1` so `AudioInput::Refresh` never asks. The host
+  row's choices are wftest's: the track (`musicAt` and its five helpers copied from
+  `tools/wftest/main.cpp` into the glue, held character for character by `check_shaders.py`,
+  with kFeedRate, the types and the `--host-fft` loop, formula and setter lines), `--left-only`,
+  `--silent` (earshot goes Silent after 3 s, the lamp steady red), and `--host-fft` (nothing
+  fed; the fallback on the synthetic spectrum, the lamp amber); plus a file of the visitor's,
+  decoded by `decodeAudioData` in an `OfflineAudioContext` at 48 kHz (no output device), mono
+  to both channels, fed through `wf_feed` and looped (wftest --wav plays once). Each frame
+  feeds the samples up to the page's clock × 48 000. Nothing is played aloud. Every audio
+  change is a new instance from time 0 (a feed lasts until a selectDevice, which nothing
+  here calls), and the page's default is the track where the plugin's own is "None (host
+  FFT)".
+- **The clock.** The page sends seconds from frame deltas (capped at 0.1 s). Each new instance
+  (load, a change of audio, Restart) is primed with five frames about a millisecond apart so
+  the plugin's seconds-or-milliseconds vote settles before the first frame shown (mirrorball's
+  fix): on the feed path nothing is fed during them, so a paused page stands still. On the
+  host-FFT choice the fallback counts samples off the plugin's own clock, which is the wall
+  clock until the vote settles, so the prime gives a new instance about 6 ms (some 190 samples)
+  of the spectrum, as a host's first frames would; wftest presets its clock and never does.
+- **Photosensitivity.** The page's own audio through `wftest --pipe` at 320×180, 60 fps, over a
+  flat grey and over colour bars, measured with xenon's flashcheck rule (whole frame and 5×5
+  third-of-frame windows; over six transitions in a second is over the line): the **Lit**
+  view made 0 transitions at the default Drive and at +30 dB, on the track, the left-only
+  track and the host-FFT spectrum; the **Height** view made 10 (whole frame) and 17 (worst
+  window) on the track at the default Drive, 16 and 21 at +30 dB, 0 and 10 on the left-only
+  track, 6 and 12 on the host-FFT spectrum (8 and 15 at +30 dB). The release survey's figures
+  (33 of Resolume's clips: Height over the line on 10 with a master at about −9 dBFS RMS,
+  worst 22; Lit under on all 33 at default and full Drive) are on the page with these. So the
+  page opens in Lit (the plugin's default, unchanged), no preset uses Height (checked at load;
+  the page throws if one does), a link opening in Height opens paused, and a caution line shows
+  whenever View is Height. Embed mode (`?embed=1`) shows neither and applies no rule.
+- **Checked by `tools/verify.sh`** (`demo/tools/check_shaders.py`): the four GLSL pieces
+  character for character and the order AssembleVertex()/AssembleFragment() join them (read
+  from Shaders.cpp and InitGL's `Compile( vertex, fragment )`); all 21 uniforms set by the
+  setter their type takes and nothing undeclared set; wftest's track in the glue; no served
+  file naming a device API; the hashes of every input the .wasm was built from
+  (`demo/wasm/inputs.sha256`, 55 files) and the SDK pin. Any change under `source/` or
+  `external/earshot/` needs `demo/tools/build-wasm.sh` rerun and its outputs committed (mode
+  644).
+- **Compared with wftest, once (2026-11-18), by `demo/tools/crosscheck.py`** (in the repo;
+  nothing runs it by itself: it needs Chrome, cdpshot and a built wftest). Headless Chrome on
+  the real GPU (ANGLE on Metal), the page paused, the settings applied, Restart, then N presses
+  of Step (800 N samples fed, the clock at N/60); Mix 0 hands the clip back so the canvas is the
+  exact input frame; `wftest --pipe --fps 60` gets that frame N times with the same host values,
+  and its last frame (fed the same 800 N samples) is compared. Apple M4 Max, 640×360 (691,200
+  colour values a case):
+
+  | case | clip | N | colour values off | max | stop hits, page / wftest |
+  | --- | --- | --- | --- | --- | --- |
+  | defaults, the track | scene | 330 | 423 | 1 code | 17 / 17 |
+  | 10 cm full-range at +6 dB | bars | 180 | 17 | 1 code | 0 / 0 |
+  | Height view | grid | 240 | 48 | 1 code | 12 / 12 |
+  | open baffle, Ripple 1000, left only, Channel Left | detail | 200 | 973 | 1 code | 52 / 52 |
+  | 18 in PA sub at +30 dB, Exposure 0, Mix 50% | spot | 150 | 565 | 1 code | 313 / 313 |
+  | None (host FFT), defaults (reported, not judged) | scene | 120 | 159,775 | 117 codes | 12 / 17 |
+
+  Alpha identical in every case, and the tap-sample counts identical in the five feed cases
+  (175,988 on the defaults). The negative control (wftest with Drive one slider step, 0.001,
+  off on the defaults case) puts 2,526 values off, up to 10 codes. So on the feed path the
+  wasm integrator lands on the Mac's to within the GPU's last code even through hundreds of hits
+  of the stop. The host-FFT case differs for the clock reason above: the page's instance had
+  64,195 tap samples against wftest's 63,999 (the run-to-run spread is the prime's wall time).
+- **Also checked on the page** (CDP, the real GPU): the defaults read back as the plugin's
+  (30 cm Subwoofer, 0.707, ×1.00, +0.10 gap, ×1.00, L+R, +18.0 dB, Linear Mag, ×0.95, ×1.50,
+  8.0 ms, 150×, 40°, 135°, 0.20, 0.85, On, Lit, 100%); the coil moves with the track (−13 to +21 mm over
+  a second), the lamp is green on the feed, steady red after 3 s of zeros, amber on the host
+  FFT; Driver changes the picture paused, Drive changes it playing (the negative control
+  above); a WAV chosen through the file input decodes and drives the cone; all eleven presets
+  render with no GL error and Defaults gives the first frame back exactly; `?view=1` opens
+  paused with the caution; no horizontal scroll at 375 px; no console errors.
+- **Every gap, as the page discloses it** (banner, the panel's note, the "does not reproduce"
+  list): it runs the plugin, not a port, and the units, tooltips and presets are the page's;
+  no audio device or microphone, earshot built without capture, Audio Input, Rescan Inputs and
+  the Audio buffer off the panel, the live-device path absent; the audio is the harness's track
+  or a file decoded, resampled to 48 kHz and looped in the page, never played aloud; "None
+  (host FFT)" runs on a synthetic spectrum, not a real FFT, and is uncalibrated; every audio
+  change is a new instance from time 0, and the page's default audio is not the plugin's; GL is
+  emscripten's WebGL2 with four shimmed entry points and the kit's GLSL port; the clock is the
+  page's and primed, and a paused control move feeds nothing; a frame is a display refresh
+  (the feed path does not depend on it, the fallback does); WebAssembly has no fused
+  multiply-add and musl's libm; the clip is the kit's and premultiplied, so the kit's alpha
+  clip is left out; the warning, caution and open-paused rule are the page's; the About block
+  is off the panel; nothing is measured, and the plugin has never been in Resolume or opened a
+  device.
+- **Traps hit**: `ffglex/FFGLShader.cpp` calls `ffglex::Log`, which is in FFGLUtilities.cpp
+  (an undefined symbol at link until it was added); the kit's canvas has no
+  `preserveDrawingBuffer`, so a paused page reads back zeros unless the attribute is forced
+  from outside (`Page.addScriptToEvaluateOnNewDocument` with a `getContext` override); the
+  kit's inspector note says every declared parameter is on the panel, so the page appends
+  which four are not; the host-FFT spectrum's lines live in `tools/wftest/run.inc`, not
+  main.cpp, so the harness check reads all three of wftest's files; the read-out column fits
+  about ten characters, so units went into the tooltips.

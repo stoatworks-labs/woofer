@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Woofer — browser demo | Stoatworks Labs</title>
+    <meta name="description" content="Try the Woofer FFGL effect for Resolume in your browser: your clip printed on the front of a real woofer, and the music driving the woofer. A cone driver from a real datasheet sits in a sealed box, voltage-driven by the waveform and integrated at 32 kHz, so kicks pump the cone and hi-hats leave it still. The plugin's own C++ compiled unmodified to WebAssembly, drawing with its own GLSL in WebGL2, fed its harness's synthetic track or a file of yours, never a microphone. A demo, not the plugin." />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./vendor/kit.css" />
+    <link rel="stylesheet" href="./woofer.css" />
+    <link rel="canonical" href="https://woofer-demo.stoatworks-labs.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stoatworks Labs" />
+    <meta property="og:title" content="Woofer — browser demo | Stoatworks Labs" />
+    <meta property="og:description" content="Try the Woofer FFGL effect for Resolume in your browser: your clip printed on the front of a real woofer, and the music driving the woofer. A cone driver from a real datasheet sits in a sealed box, voltage-driven by the waveform and integrated at 32 kHz, so kicks pump the cone and hi-hats leave it still. The plugin's own C++ compiled unmodified to WebAssembly, drawing with its own GLSL in WebGL2, fed its harness's synthetic track or a file of yours, never a microphone. A demo, not the plugin." />
+    <meta property="og:url" content="https://woofer-demo.stoatworks-labs.com/" />
+    <meta property="og:image" content="https://stoatworks-labs.com/thumbs/woofer.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:alt" content="Woofer" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <section class="wf-warning" id="photosensitivity" aria-labelledby="wf-warning-title">
+      <h2 class="wf-warning__title" id="wf-warning-title">Photosensitivity warning</h2>
+      <p>
+        <strong>The Height view flashes with loud music</strong>, this page's own track included.
+        It shows the cone's stroke as grey across the whole picture, and every kick brightens and
+        darkens it. Flashing light can trigger seizures in people with photosensitive epilepsy. If
+        you, or anyone who can see your screen, may be affected, stay in the Lit view.
+      </p>
+      <p>
+        Broadcast and web guidance (Ofcom's, and WCAG's) puts the line at three flashes in any
+        second, six rises and falls in brightness. Measured from the plugin's own output with
+        xenon's rule (the whole frame and each third of it, at 60 fps): on this page's track at
+        the default Drive the Height view made 10 rises and falls in its worst second over the
+        whole picture and 17 in its worst third (16 and 21 at full Drive, +30 dB); over 33 of
+        Resolume's demo clips, with music mastered to about −9 dBFS RMS, it went over the line on
+        10, at worst 22. The Lit view, the plugin's default, stayed under the line in every one of
+        those runs, at the default Drive and at full Drive, and never raised a clip's own flash
+        rate.
+      </p>
+      <p>
+        The page opens in the Lit view, and no preset uses the Height view. A link that opens in
+        it opens paused, and a caution line under the picture says so whenever View is Height.
+        The status lamp, a small LED below the driver, flashes white each time the coil hits its
+        stop, which the track's loudest kicks do; the Lit figures include it.
+        <strong>Pause</strong>, under the picture, stops it at once.
+      </p>
+    </section>
+
+    <main id="demo">
+      <noscript>
+        <h1>Woofer</h1>
+        <p>
+          A loudspeaker for Resolume Arena and Avenue, as an FFGL effect: your clip is printed on
+          the front of a real woofer, and the music drives the woofer. Nothing is animated by a
+          parameter. A cone driver set by the Thiele–Small parameters of a real datasheet sits in
+          a sealed box and is voltage-driven by the audio waveform, integrated at 32 kHz with the
+          motor's force falling as the coil leaves the gap, the suspension stiffening, the air
+          spring, a hard stop and four breakup modes. So kicks pump the cone and hi-hats leave it
+          still, a big hit flat-tops, the coil bottoms, an overdriven cone drifts, and the printed
+          clip magnifies, stretches and creases as the cone comes toward the camera.
+        </p>
+        <p>
+          This demo runs the plugin's own C++, compiled to WebAssembly, and its shaders in your
+          browser, so it needs JavaScript and WebGL2. It never uses a microphone.
+        </p>
+        <ul>
+          <li><a href="https://github.com/stoatworks-labs/woofer">Source on GitHub</a></li>
+        </ul>
+      </noscript>
+    </main>
+
+    <script type="module" src="./plugin.js"></script>
+    <script
+      src="./vendor/support-footer.js"
+      defer
+      data-app="Woofer"
+      data-repo="https://github.com/stoatworks-labs/woofer"
+      data-note="A browser demo of the plugin's own C++ and shaders, compiled to WebAssembly and WebGL2. It never uses a microphone, and nothing you load here leaves your machine."
+    ></script>
+  </body>
+</html>

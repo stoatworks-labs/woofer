@@ -1,0 +1,55 @@
+/*
+ * Woofer's own additions to the kit's page: the photosensitivity note at the
+ * top, the caution line and the plugin's log under the picture. Everything
+ * else is vendor/kit.css, unedited. (mirrorball's note, laid out as theirs.)
+ */
+
+.wf-warning {
+  /* #demo is 1400px wide with a 20px gutter: line up with what is inside it. */
+  max-width: 1360px;
+  margin: 24px auto 0;
+  padding: 14px 18px;
+  background: #1f1a0c;
+  border: 1px solid #5a4613;
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  color: #f3e9cf;
+}
+
+@media (max-width: 1400px) {
+  .wf-warning { margin-left: 20px; margin-right: 20px; }
+}
+@media (max-width: 480px) {
+  .wf-warning { margin-left: 16px; margin-right: 16px; padding: 12px 14px; }
+}
+
+.wf-warning__title {
+  font-size: 17px;
+  color: var(--warn);
+  margin: 0 0 4px;
+}
+
+.wf-warning p { margin: 8px 0 0; max-width: 80ch; font-size: 14px; }
+
+/* body has embed set when ?embed=1: the note is the page's, not the picture's. */
+body[data-embed] .wf-warning { display: none; }
+
+/* ---- the lines under the picture ----------------------------------------- */
+
+.wf-status { overflow-wrap: anywhere; }
+
+.wf-caution {
+  border-color: #5a4613;
+  background: #1f1a0c;
+  color: #f3e9cf;
+}
+
+.wf-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The host row's file note may run long: let it wrap rather than widen the page. */
+#woofer-audio-note { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }

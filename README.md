@@ -177,6 +177,22 @@ Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
   own soundtracks and a mix of them mastered to −12 dBFS, looked at as stills, not in a show.
 - No user guide, no presets, no OpenFX port and no browser demo.
 
+## Browser demo
+
+[woofer-demo.stoatworks-labs.com](https://woofer-demo.stoatworks-labs.com/) runs the plugin in
+your browser: its own C++, the plugin class with the driver integrated in double at 32 kHz, the
+profile table, its audio input and earshot under it, compiled unmodified to WebAssembly and
+drawing with its own GLSL in WebGL2. The page is the host, and it never opens or lists an audio
+device or asks for a microphone. It feeds the plugin through earshot's `feed()` as `wftest`
+does: `wftest`'s own track of kicks, hats and a 55 Hz bass, the track on the left channel only,
+silence, or an audio file of yours decoded in the page and never uploaded; or nothing at all,
+with `wftest --host-fft`'s made-up kick spectrum in the Audio buffer for the plugin's own
+fallback. Audio Input, Rescan Inputs and the live-device path are not in the browser. A frame of
+the page matched `wftest`'s on the same settings and audio to one 8-bit code in five cases (the
+fallback case does not match, and [AGENTS.md](AGENTS.md#browser-demo) says why). It opens in the
+Lit view; the Height view can flash with loud music, and the page says so at the top. It is a
+demo, not the plugin, and the page lists what it leaves out.
+
 ## Build
 
 macOS (universal: Apple Silicon and Intel):

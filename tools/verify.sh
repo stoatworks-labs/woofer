@@ -67,6 +67,21 @@ step "Shaders"
 tools/glslc.sh || fail "a shader does not compile"
 
 #---------------------------------------------------------------------------
+step "Browser demo's copies"
+#---------------------------------------------------------------------------
+# demo/shaders.js must be source/Shaders.cpp's GLSL character for character,
+# with the order AssembleVertex() and AssembleFragment() join it in; every
+# uniform must be set by the setter its type takes (WebGL2 drops a wrong one
+# silently); the glue's track must be wftest's; no served file may name a
+# device API; and the .wasm's recorded inputs must still hash as they did when
+# demo/tools/build-wasm.sh built it (rebuilding needs emscripten).
+if [[ -f demo/tools/check_shaders.py ]]; then
+	python3 demo/tools/check_shaders.py || fail "the demo's copies have drifted from the plugin's"
+else
+	echo "   skipped: no demo/"
+fi
+
+#---------------------------------------------------------------------------
 step "Submodule and snapshot"
 #---------------------------------------------------------------------------
 if [[ ! -f external/ffgl/CMakeLists.txt ]]; then
