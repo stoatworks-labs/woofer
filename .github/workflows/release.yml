@@ -70,7 +70,7 @@ jobs:
       - name: Check the DLL (Windows)
         if: runner.os == 'Windows'
         run: |
-          ./tools/wincheck.ps1 -Dll "build/Release/Woofer.dll" -Name "SW Woofer" -Id WF01 -Kind effect -Params 26 -First "Driver"
+          ./tools/wincheck.ps1 -Dll "build/Release/Woofer.dll" -Name "SW Woofer" -Id WF01 -Kind effect -Params 27 -First "Driver"
           if( $LASTEXITCODE ) { exit $LASTEXITCODE }
 
       - name: Derive version

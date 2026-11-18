@@ -113,7 +113,7 @@ jobs:
         # pwsh checks only the LAST exit code of a step: it is checked here.
         # -Params changes whenever a control or the About block does.
         run: |
-          ./tools/wincheck.ps1 -Dll "build/Release/Woofer.dll" -Name "SW Woofer" -Id WF01 -Kind effect -Params 26 -First "Driver"
+          ./tools/wincheck.ps1 -Dll "build/Release/Woofer.dll" -Name "SW Woofer" -Id WF01 -Kind effect -Params 27 -First "Driver"
           if( $LASTEXITCODE ) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@v7

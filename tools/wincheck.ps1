@@ -2,7 +2,7 @@
     What a host sees of a built Windows DLL, with no GL and no Resolume.
 
         tools/wincheck.ps1 -Dll build/Release/Woofer.dll -Name "SW Woofer" `
-                           -Id WF01 -Kind effect -Params 26 -First "Driver"
+                           -Id WF01 -Kind effect -Params 27 -First "Driver"
 
     It LOADS the DLL (so a missing runtime or dependency fails here, where
     dumpbin cannot see it), finds plugMain, and asks it what Resolume asks
