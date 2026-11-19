@@ -18,14 +18,14 @@ and the whole front is lit as a glossy relief. At rest the picture is your clip.
 *One frame from the offline harness, not captured from Resolume: the defaults over the harness's
 card, 5.5 seconds into its track of kicks, hats and a bass note.*
 
-> **Before you rely on this:** it's at **v0.1.0**, the first release, and early days. Everything
+> **Before you rely on this:** it's at **v0.1.1**, the second release, and early days. Everything
 > below was compiled, rendered and measured offline on an Apple Silicon Mac (macOS 26), by a
 > harness that drives the plugin's own class in a headless GL context, at two rasters (1280×720
 > and 320×180) and partly on Apple's software renderer, feeding it audio through the same path a
 > device would use. The cone's stroke matches the sealed box's textbook transfer function to
 > 3.2 × 10⁻⁴ over 24 sines from 10 Hz to 2 kHz on all five drivers; the coil never passes its
 > mechanical limit; and the same audio at 24, 30, 60 and 144 fps gives the same stroke, bit for
-> bit. Nineteen models that are wrong on purpose and seventeen one-character changes to the
+> bit. Twenty-two models that are wrong on purpose and seventeen one-character changes to the
 > shipped code are all caught, and every control that has pixels changes the picture.
 > In Resolume it has run only on one layer over a still: in Arena 7.29.0 on a Mac, and in Arena
 > 7.27.1 on Windows on software rendering. There it registers, shows its controls with the
@@ -78,14 +78,14 @@ it trips SmartScreen once: **More info** → **Run anyway**. Or skip the install
 2. **Give it music.** With **Audio Input** at **None (host FFT)**, the default, woofer listens
    to Resolume's own spectrum of the composition's audio (the **Audio** control picks which
    audio, as on any Resolume effect). Play a clip with sound and the cone pumps on the bass,
-   though at the default Drive only a little: on Arena's demo drum loop, about 6% of its stroke
+   though at the default Drive only a little: on Arena's demo drum loop, about 4% of its stroke
    at the peaks (see [Where the audio comes from](#where-the-audio-comes-from)). Turn **Drive**
-   up, or try another **FFT Law**, for more. For the real thing, pick an input
+   up for more. For the real thing, pick an input
    by name in **Audio Input**: woofer then drives the cone with that input's waveform, and the
    lamp turns green.
 3. **Drive** is the amplifier. At the default, +18 dB, a kick in Resolume's quiet demo stems,
    fed as an input feeds it, moves the sub about a sixth of the way to its stop (on Resolume's
-   own spectrum, about 6%), and a loud master about 40% of the way.
+   own spectrum, about 4%), and a loud master about 40% of the way.
    Turn it up until the lamp flashes white on the loudest hits: that's the coil hitting its stop.
 4. Try **Driver** at **10 cm Full-range**: a small, light cone with a higher resonance, set from
    its own datasheet like the others.
@@ -154,12 +154,15 @@ stems, quiet: −18 to −42 dBFS RMS) and with the same stems layered and maste
 | **Height** | +18 dB | about −11 dBFS RMS | **5 of 33** | **19** |
 | **Height** | +18 dB | about −9 dBFS RMS | **10 of 33** | **22** |
 | Lit | +18 dB | the fallback, on the harness's synthetic kick spectrum | 0 of 33 | 6, the clip's own |
-| **Height** | +18 dB | the fallback, on the harness's synthetic kick spectrum | **33 of 33** | **9** |
+| **Height** | +18 dB | the fallback, on the harness's synthetic kick spectrum | 0 of 33 | 6 |
 
 The last two rows are the fallback (**None (host FFT)**) fed a synthetic spectrum with a kick on
-every beat, hot enough to put the sub on its stop 77 times in 7.5 seconds: in the Height view that
-crossed the line on every clip. Resolume's own spectrum of a real track is gentler or harder
-depending on the track and on **FFT Law**.
+every beat, laid out as Resolume lays out its own. Up to v0.1.0 the bass band took all of
+Resolume's lowest bin, and the same spectrum put the sub on its stop 77 times in 7.5 seconds and
+crossed the line in the Height view on every clip; since v0.1.1 it takes its share, and the stop
+was hit 3 times and no clip crossed. Resolume's own spectrum of a real track is gentler or harder
+depending on the track, and at full Drive (+30 dB) the fallback's Height view still crossed the
+line on the browser demo's track (7 over the whole picture, 13 in the worst third).
 
 **The Lit view never added a flash**: in every run each clip's worst second was the clip's own,
 through woofer or not (one of Resolume's clips, Beat 002, reaches the line, 6, on its own). The
@@ -193,14 +196,16 @@ demo](https://woofer-demo.stoatworks-labs.com/) opens on the Lit view.
   plays one sine per band (63, 400, 1600 and 6400 Hz) at the band's level. The cone still pumps
   on the bass and stays still on the hats, and the motor, the stop and the drift all still act,
   but **it can't show the music's waveform** (two kicks of different pitch look the same), **its
-  level isn't calibrated** (**FFT Law** chooses how Resolume's numbers are read, and a band above
-  1 is taken as 1), and **it steps once a frame**, so unlike an input it depends on the frame rate.
+  level isn't calibrated** (how hard a band's level pushes is set by **Drive**, and a band above 1
+  is taken as 1), and **it steps once a frame**, so unlike an input it depends on the frame rate.
   **In Arena 7.29.0 on a Mac it moves the cone, but not far.** With Arena's demo drum loop
-  `Beat 001.wav` playing on the layer below, the cone's peaks were about 6% of its stroke at the
-  default Drive (+18 dB) and **FFT Law** (Linear Mag), 12% at +24 dB and 15% at +30 dB; at
-  +18 dB, Log Mag gave 7%, Linear Power 14% and Log Power 69%. A quieter clip (Arena's
-  `Bass 001.wav`, 18 dB down) barely moved it. If the cone hardly moves on None (host FFT) with
-  music playing, turn **Drive** up, try another **FFT Law**, or pick an input.
+  `Beat 001.wav` playing on the layer below, the cone's peaks were about 4% of its stroke at the
+  default Drive (+18 dB) and **FFT Law** (Linear Mag), 5% at +24 dB and 19% at +30 dB. A quieter
+  clip (Arena's `Bass 001.wav`, 18 dB down) barely moved it. Resolume's spectrum comes in 64
+  slices of 375 Hz, so its lowest, 0 to 375 Hz, holds the kick, the bass line and the low toms as
+  one number; woofer's bass band takes its share of it, 180 Hz of the 375 (up to v0.1.0 it took all of it,
+  and the cone moved about 1.4 times as far). If the cone hardly moves on None (host FFT) with
+  music playing, turn **Drive** up or pick an input.
 
 **Resolume's Audio setting.** Resolume adds its own **Audio** control to woofer, as to any effect
 that reads its spectrum, with three choices. **Composition** (the default) hears every clip
@@ -252,7 +257,7 @@ Resolume Arena. An unpatched Dante receiver or an empty loopback looks the same.
 | **Rescan Inputs** | button | | Lists the inputs again. |
 | **Channel** | L+R, Left, Right | L+R | Which channel of an input. |
 | **Drive** | −20 to +30 dB | +18 dB | The amplifier, over the voltage at which a full-scale DC input would hold the cone at Xlin, the end of the coil's linear travel. The slider is linear in dB. |
-| **FFT Law** | Linear Mag, Linear Power, Log Mag, Log Power | Linear Mag | How the fallback reads Resolume's spectrum: whether its bins are spaced linearly or logarithmically, and whether they hold magnitude or power. Nobody has measured which Resolume sends. |
+| **FFT Law** | Linear Mag, Linear Power, Log Mag, Log Power | Linear Mag | How the fallback reads Resolume's spectrum: whether its bins are spaced linearly or logarithmically, and whether they hold magnitude or power. Arena 7.29.0's was measured: Linear Mag, the default. The others are for a host that sends its spectrum another way. |
 | **Audio** | Resolume's own | Composition | The spectrum the fallback reads, as on any audio-reactive Resolume effect. |
 
 ---
@@ -334,7 +339,7 @@ isn't there. Or Drive is too low for the track: turn it up.
 
 **It moves on everything, not just the kick.** On the fallback, the high bands are played as
 sines at 1600 and 6400 Hz, and a small driver, with its higher resonance, moves more on those than
-a big one. Try a bigger driver, or a different **FFT Law**.
+a big one. Try a bigger driver.
 
 **The lamp keeps flashing white.** The coil is hitting its stop: Drive is too high for this
 track and this driver.
@@ -367,10 +372,12 @@ Windows  %LOCALAPPDATA%\woofer\logs\woofer.YYYY-MM-DD.log
 - **No live audio device has been opened**, by woofer or by the audio library inside it, on any
   machine. The device menu, its states and the lamp are proved on a scripted device in the
   harness. Try your input before a show.
-- **The fallback is uncalibrated.** Nobody has measured what Resolume's spectrum holds; FFT Law
-  is the guess, exposed. A band level above 1 is taken as 1. Under the two Linear laws the bass
-  band, the one that plays the 63 Hz sine, reads a single bin of Resolume's spectrum, its lowest.
-  It can't show the waveform, and it depends on the frame rate.
+- **The fallback is uncalibrated.** How Resolume lays out its spectrum was measured in Arena
+  7.29.0 (FFT Law's default, Linear Mag), but how hard a band's level should drive the cone is a
+  choice, set by Drive. A band level above 1 is taken as 1. Resolume's lowest slice of its
+  spectrum covers 0 to 375 Hz, so the bass band, the one that plays the 63 Hz sine, gets the kick, the bass line and
+  the low toms as one number (its 180/375 share). It can't show the waveform, and it depends on
+  the frame rate.
 - **The audio analysis costs CPU it doesn't use**: about 0.5 ms a frame on the render thread,
   every frame, with no switch to turn it off in this version.
 - **Chosen, not measured:** the cone's profile and the dust cap's and surround's shapes, the

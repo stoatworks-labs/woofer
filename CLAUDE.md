@@ -51,8 +51,10 @@ Read `AGENTS.md` before touching the integrator (`DriverModel::Run`), Bl(x) and 
   - **Picture**: `--rest` (silence is the clip), `--magnify` (DC stroke and the pinhole),
     `--alpha` (mix(clip alpha, 1, Mix)), `--resize` (a new raster changes only the drawing).
   - **Audio**: `--fallback` (Resolume's FFT: 63 Hz, the sample count, the amber lamp, a
-    millisecond clock), `--devices` (the menu, states and lamp on a scripted backend).
-- The checks can fail: `./build/wftest --negative` (19 wrong models; `WFTEST_NEGATIVE=name`
+    millisecond clock), `--hostbins` (Resolume's bins as Arena builds them: the bass band's
+    share of bin 0 and the host's rate; named apart from the `--host-fft` source flag),
+    `--devices` (the menu, states and lamp on a scripted backend).
+- The checks can fail: `./build/wftest --negative` (22 wrong models; `WFTEST_NEGATIVE=name`
   runs one check's), `tools/mutate.sh` (17 mutants, arm64, 320x180, perl alarm at 300 s).
 - No dead controls: `python3 tools/sweep.py` (`--bare` drops the contexts).
 - Render cost: `./build/wftest --bench` (720p, 1080p); `--bench4k` adds one 4K run.
@@ -85,7 +87,7 @@ Read `AGENTS.md` before touching the integrator (`DriverModel::Run`), Bl(x) and 
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
 - `external/earshot/` is a snapshot of earshot (`github.com/stoatworks-labs/earshot`) at
-  `8124191`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
+  `02306da`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
   snapshot. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines and all.
 - **Generated, never edited here:** `source/StoatworksAbout*.h` (stoatworks-backend's
   `sync-about.py`, from the website's projects.json) and `ATTRIBUTIONS.md` (`sync-attributions.py`,

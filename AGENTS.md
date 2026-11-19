@@ -7,19 +7,23 @@ departs from it).
 
 ## Status
 
-**v0.1.0, released 2026-11-18, public at `github.com/stoatworks-labs/woofer`.**
-`OXBOW=… tools/verify.sh` passes on this Mac (Apple
+**v0.1.1, released 2026-11-19, public at `github.com/stoatworks-labs/woofer`** (v0.1.0
+2026-11-18). 0.1.1 is earshot `02306da`, which reads Resolume's bins as Arena 7.29.0 was measured
+to send them and shares each among the bands it overlaps, and the host's sample rate from
+`SetSampleRate`. `OXBOW=… tools/verify.sh` passes on this Mac (Apple
 Silicon, macOS 26) against a fresh universal Release build: every check at 1280x720 and
-320x180, six on Apple's software renderer, `--offline` with no GL context, the pipe, 19 of 19
+320x180, six on Apple's software renderer, `--offline` with no GL context, the pipe, 22 of 22
 negative controls, 17 of 17 mutants, 19 of 19 controls alive in the sweep, oxbow reading and
-rendering the bundle with devices disabled. **In Resolume only briefly** (2026-11-18): Arena
+rendering the bundle with devices disabled. **In Resolume only briefly** (2026-11-18 and 19): Arena
 7.29.0 on this Mac over REST (registers, 28 parameters, Mix 0 is the still; Audio Input is a
 value, not an index; Resolume's Composition FFT moves the cone with `Beat 001.wav` playing below:
-peaks of 5.6% of Xmech at +18 dB Linear Mag, 15.1% at +30 dB, 69% under Log Power, re-tested
-2026-11-19; the 2026-11-18 run heard nothing because `Beat 001.mov` has no audio stream) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
+an A/B on 2026-11-19, a launch each, at +18 dB Linear Mag peaks of 9.9% of Xmech on v0.1.0's
+bundle and 3.9% on 0.1.1's, and pooled over three Drives the RMS 0.69 of 0.1.0's where
+`--hostbins` says 0.693; 0.1.1 logs `host audio at 48000 Hz`; the 2026-11-18 run heard nothing
+because `Beat 001.mov` has no audio stream) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
 0 failed, 2 skipped; `plugin-bench/arena/expect/woofer.json`). README "In Resolume" has the
 detail. **No live audio device ever opened**, by woofer or by earshot.
-earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `8124191`, unpatched.
+earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `02306da`, unpatched.
 
 ## The idea
 
@@ -34,11 +38,14 @@ lit as a heightfield. Audio drives the mechanism, never a parameter wobble.
 
 - **Identity.** `SW Woofer`, `WF01`, effect, `com.stoatworks.ffgl.woofer`, harness `wftest`.
   One plugin, the About block last.
-- **earshot, snapshotted, not a submodule.** `external/earshot/` is `git archive 8124191` of
+- **earshot, snapshotted, not a submodule.** `external/earshot/` is `git archive 02306da` of
   earshot (`github.com/stoatworks-labs/earshot`), with `SNAPSHOT` saying so and "Patches: none". Configured
   with `tapRate = 32000`, `maxChannels = 2`, four bands with edges {20, 200, 800, 3200, 12800}
-  Hz (used only by the fallback: under the Linear law bin 0, centred on 172 Hz, lands in the
-  first band; earshot's default 30–150 Hz band gets no bin at all).
+  Hz (used only by the fallback). Since 0.1.1 each of Resolume's bins is shared among the bands
+  it overlaps, by width, at the host's sample rate: on Arena's 375 Hz bins the first band takes
+  180/375 of bin 0's energy (its level 0.693 of bin 0's) and the second the rest of bin 0 above
+  200 Hz. Under 8124191 the bins were read as linear to 22.05 kHz and each went whole to the band
+  holding its centre, so the first band got all of bin 0, 0–375 Hz on Arena.
 - **The integrator.** Classical RK4, two substeps per tap sample (h = 1/64000, planned from the
   10F's electrical pole at Re/Le, |λh| = 0.9 against RK4's 2.78), the voltage between samples
   by Catmull–Rom, **one sample behind**: trace index k pairs with volts index k − 1, and every
@@ -86,7 +93,10 @@ lit as a heightfield. Audio drives the mechanism, never a parameter wobble.
   clamped to [0, 1] and ramped linearly across the frame, continuous in phase; the number of
   samples from the host clock (dt × 32000 with a carry, at most 0.25 s a frame). Stated in the
   README, the spec and the label ("None (host FFT)"): it pumps, it cannot show the waveform,
-  it is uncalibrated, and it is frame-rate dependent.
+  it is uncalibrated, and it is frame-rate dependent. The host's sample rate comes from FFGL
+  `SetSampleRate` (overridden: see the traps), kept in an atomic and handed to earshot on the
+  render thread in the same `configure` as FFT Law, logged once per change; 0 or a rate outside
+  8–768 kHz keeps earshot's 48 kHz.
 - **The clock** votes seconds or milliseconds against the host's step (ferrofluid's vote with
   fountain's patience), so a millisecond host clock at 4.99e8 drives the fallback's sample
   count correctly (`--fallback`).
@@ -211,6 +221,10 @@ there is no switch to turn it off.
   mutant rather than trusting a restored file to look newer.
 - **zsh has no PIPESTATUS** (and does not word-split an unquoted variable): verify.sh and
   mutate.sh are bash.
+- **The FFGL SDK never initialises `CFFGLPlugin::sampleRate`**: woofer overrides the virtual
+  `SetSampleRate` and keeps its own atomic (0 until the host calls), as snowglobe does.
+- **`--hostfft` would have sat beside the `--host-fft` source flag**: the 0.1.1 check is
+  `--hostbins`.
 
 ### earshot, as a first consumer found it (nothing patched)
 
@@ -220,8 +234,13 @@ there is no switch to turn it off.
   harness's audio, so woofer selects only when the parameter changes.
 - **The scripted `CaptureBackend` delivers at 4× real time.** `--devices` waits on states, not
   on wall time, except the one 100 ms limit (a third of a 300 ms open, over the frame's own cost).
-- **The Linear host-bin law gives the 30–150 Hz band no bin** (documented by earshot): woofer's
-  first band starts at 20 Hz and ends at 200.
+- **Up to 8124191 a host bin went whole to the band holding its centre**, the bins read as
+  linear to 22.05 kHz: earshot's default 30–150 Hz band got no bin, woofer's 20–200 Hz band got
+  all of Arena's bin 0 (0–375 Hz), and under the Log laws every band was wrong for Arena. Fixed
+  upstream in 02306da (bins shared by overlap, Arena's measured law the default), taken in 0.1.1.
+- **`configure()` waits for the next `update()`, and `config()` returns the applied config**:
+  two configures in one frame and the first is lost, so woofer sends FFT Law and the host's
+  rate in one.
 - **Host band levels are not bounded by 1** (they are root-sum-squares of bins): woofer clamps.
 - **`update()` runs all the analysis** (thirds, onsets, pitch, tempo) whatever the consumer
   reads: ~0.5 ms a frame on the render thread for a plugin that wants only the tap.
@@ -229,7 +248,7 @@ there is no switch to turn it off.
 
 ## Verified, and assumed
 
-Verified, by `tools/verify.sh` on 16 November 2026 (numbers in README's Status): every claim in
+Verified, by `tools/verify.sh` on 19 November 2026 (numbers in README's Status): every claim in
 the table there, at 1280x720 and 320x180 on this Mac's GPU, the picture checks again on Apple's
 software renderer; the physics checks with no GL context; the negative controls and mutants;
 the sweep; the bundle universal, signed ad hoc, read and rendered by oxbow.
@@ -237,8 +256,11 @@ the sweep; the bundle universal, signed ad hoc, read and rendered by oxbow.
 Assumed: the cone's straight 25° profile, the dust cap's dome, the half-roll surround of width
 Xmech; Kms(x) stiffening 4× by Xmech; the stop's restitution 0.3; the fringe field Hg/4 each
 side; the breakup modes' frequencies (read by eye off response plots), shapes, Q and
-participation; B&C's Xmech (23 mm, not printed); the bare materials' reflectances; that
-Resolume's FFT levels are anywhere near 0..1 for music.
+participation; B&C's Xmech (23 mm, not printed); the bare materials' reflectances; how hard a host band's
+level should drive the cone (Drive and the clamp at 1). Measured, by snowglobe's probe in Arena
+7.29.0 (snowglobe's AGENTS.md, "Resolume's 64 bins, measured"): Resolume's bins are magnitudes,
+linear, 64 of 375 Hz at the engine's 48 kHz, new every 2048 samples, and `Beat 001.wav` puts a
+mean of 0.0199 and a peak of 0.109 in bin 0, well under 1.
 
 Not done: a live device; music inside Resolume beyond Arena's demo stems on its FFT (which
 moves the cone, a little at the default Drive: README "In Resolume"); presets, an OpenFX port. Windows is built by CI (MSVC,
@@ -266,11 +288,13 @@ One line per check.
   under load, so there the picture is held to 0.001 codes (the trace stays exact).
 - `--fallback`: the frequency, the sample count and the clock are state; the lamp's colour is
   read off the picture to the code. Passes on the software renderer.
+- `--hostbins`: no GL; the share to 1e-3 (float arithmetic on the same bins), the split and the
+  stroke to 1 %, all CPU.
 - `--devices`: state, and the lamp off the picture; one wall-time limit, generous by design.
 
 ## The negative controls and mutants
 
-`wftest --negative`, each wrong model required to fail its check (19, all caught, 28 s):
+`wftest --negative`, each wrong model required to fail its check (22, all caught, 28 s):
 
 | check | wrong model |
 | --- | --- |
@@ -292,6 +316,9 @@ One line per check.
 | resize | a new raster resets the driver |
 | fallback | the fallback reads the (empty) tap |
 | fallback | a millisecond host clock read as seconds |
+| hostbins | each host bin whole to the band holding its centre, 8124191's rule (`hostCentreOnly`) |
+| hostbins | the host's sample rate never reaches earshot (`ignoreHostRate`) |
+| hostbins | a host bin's whole energy to every band it touches, not shared (`hostWholeBin`) |
 | devices | menu values are positions, not keys |
 
 `tools/mutate.sh`, 17 one-character mutants of the shipped code, each built arm64 and run at
@@ -318,11 +345,14 @@ more clearly. Audio Input and Rescan Inputs are not swept (no device may be touc
 - **Does Resolume save an option's value or its index, and does it clamp values to the element
   count?** Audio Input's values are name hashes (spasis's scheme). If Arena saves the index, or
   clamps, a composition will not find its device by name. Unverifiable without a host.
-- **What do Resolume's FFT bins hold for music?** The fallback assumes levels near 0..1; at the
-  default Drive a level of 1 puts the 30 cm on the stop. FFT Law is exposed because nobody has
-  measured the bins. On Arena's Beat 001 (−22 dBFS RMS) the default Drive and law gave peaks of
-  only 5.6% of Xmech, and Log Power 69% (2026-11-19): a stem sits well under 1 there. Whether the
-  default law or Drive should change for the fallback is open.
+- **What do Resolume's FFT bins hold for music?** Closed in 0.1.1: snowglobe measured Arena
+  7.29.0's (magnitudes, linear, 64 bins of 375 Hz; `Beat 001.wav` puts a mean of 0.02 and a peak
+  of 0.11 in bin 0). FFT Law keeps its default, Linear Mag, the measured law; the Log laws stay
+  for hosts nobody has measured.
+- **Should the fallback drive harder than an input?** On Beat 001 (−22 dBFS RMS) the default
+  Drive gives peaks of about 4% of Xmech on the fallback, where a band level of 1 would put the
+  30 cm on the stop. Whether the default Drive, or a gain for the fallback alone, should change
+  is open.
 - **Is +18 dB the right default Drive?** It suits stems and a −12 dBFS loopback; a −8 dBFS
   master will hit the stop on most kicks (physical, and loud).
 - **Should earshot offer a tap-only mode?** About 0.5 ms a frame of analysis woofer ignores.
@@ -387,7 +417,8 @@ https://woofer-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed by
   view made 0 transitions at the default Drive and at +30 dB, on the track, the left-only
   track and the host-FFT spectrum; the **Height** view made 10 (whole frame) and 17 (worst
   window) on the track at the default Drive, 16 and 21 at +30 dB, 0 and 10 on the left-only
-  track, 6 and 12 on the host-FFT spectrum (8 and 15 at +30 dB). The release survey's figures
+  track, 3 and 6 on the host-FFT spectrum (7 and 13 at +30 dB; 6 and 12, 8 and 15 before
+  0.1.1). The release survey's figures
   (33 of Resolume's clips: Height over the line on 10 with a master at about −9 dBFS RMS,
   worst 22; Lit under on all 33 at default and full Drive) are on the page with these. So the
   page opens in Lit (the plugin's default, unchanged), no preset uses Height (checked at load;

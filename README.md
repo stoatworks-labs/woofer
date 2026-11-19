@@ -4,7 +4,7 @@
 > (Anthropic), directed and reviewed by a human author. **It has run in Resolume only briefly,
 > on one layer over a still (Arena 7.29.0 on a Mac, 7.27.1 on Windows), and it has never opened
 > a live audio device. In Arena on the Mac, Resolume's own FFT moves the cone with a demo drum
-> loop playing, but only a little at the default Drive: about 6% of its stroke at the peaks.** What's established is established
+> loop playing, but only a little at the default Drive: about 4% of its stroke at the peaks.** What's established is established
 > by an offline harness, `wftest`, that drives the real plugin class through the same
 > `ProcessOpenGL` a host calls, in a headless GL context on a synthetic clock, on this Mac's GPU
 > at two rasters, and feeds it audio through the same earshot `feed()` path a device would use.
@@ -97,7 +97,7 @@ without stretching, and the whole front is lit as a heightfield.
 ## Where the audio comes from
 
 From an audio input, through [earshot](https://github.com/stoatworks-labs/earshot), the fleet's
-live-audio front end ([a snapshot](external/earshot/SNAPSHOT) of commit `8124191`, unmodified). Pick the input in **Audio Input**: it
+live-audio front end ([a snapshot](external/earshot/SNAPSHOT) of commit `02306da`, unmodified). Pick the input in **Audio Input**: it
 is remembered by name, so a composition reopened on another day finds the same device, and a
 device that has gone shows as missing rather than quietly becoming another one. **Rescan
 Inputs** lists what is plugged in now. The device is opened off the render thread.
@@ -114,11 +114,12 @@ is much less.** The FFT gives four band levels a frame, no phase and no waveform
 synthesises a sine per band (63, 400, 1600 and 6400 Hz) whose level follows the band. On the
 fallback the cone still pumps on the bass and stays still on the hats, and Bl(x), the stop
 and the drift all still act; but **it cannot show the music's waveform** (two kicks of
-different pitch look the same), **its level is not calibrated** (nobody has measured what
-Resolume's bins hold; **FFT Law** chooses how to read them), and **it steps once a frame**, so
+different pitch look the same), **its level is not calibrated** (how Resolume lays out its bins
+was measured in Arena 7.29.0, and **FFT Law**'s default, Linear Mag, reads them that way; how hard
+a band's level drives the cone is a choice, set by **Drive**), and **it steps once a frame**, so
 unlike the audio-input path it depends on the frame rate. The lamp is **amber** whenever the
 fallback is driving. **In Arena 7.29.0 on a Mac it moves the cone, but at the default Drive only
-by about 6% of its stroke on a demo drum loop**: see [In Resolume](#in-resolume), which also
+by about 4% of its stroke on a demo drum loop**: see [In Resolume](#in-resolume), which also
 says what Resolume's **Audio** setting (Composition, Local, External) changes.
 
 The status lamp, a small LED below and right of the driver: **green** an input is delivering;
@@ -139,7 +140,7 @@ of the stop. **Status Lamp** turns it off.
 | | **Rescan Inputs** | list the inputs again | |
 | | **Channel** | L+R, Left or Right | L+R |
 | | **Drive** | the amplifier: −20 to +30 dB over the voltage at which full-scale DC holds the cone at Xlin | +18 dB |
-| | **FFT Law** | how the fallback reads Resolume's bins: Linear/Log × Magnitude/Power | Linear Mag |
+| | **FFT Law** | how the fallback reads Resolume's bins: Linear/Log × Magnitude/Power (Arena's, measured: Linear Mag) | Linear Mag |
 | Look | **Size** | the driver's overall diameter, 0.3–1.5 × the frame height | 0.95 |
 | | **Camera** | its distance, 1–5 × the driver's diameter: perspective | 1.5 |
 | | **Exposure** | 0–40 ms of motion blur, the same at any frame rate | 8 ms |
@@ -157,14 +158,16 @@ the baffle, unlit.
 
 ## Status
 
-**v0.1.0, 18 November 2026. Run in Resolume only briefly, on one layer over a still; there
-Resolume's FFT moves the cone a little with music playing (about 6% of its stroke at the
-default Drive), and no live audio device has ever been opened.**
+**v0.1.1, 19 November 2026: Resolume's FFT read as Arena 7.29.0 was measured to send it, at the
+host's sample rate** (earshot `02306da`; v0.1.0 was 18 November). **Run in Resolume only briefly,
+on one layer over a still; there Resolume's FFT moves the cone a little with music playing (about
+4% of its stroke at the peaks at the default Drive), and no live audio device has ever been
+opened.**
 
 ### Measured offline, on macOS
 
 `tools/verify.sh` passes on this machine (Apple Silicon, macOS 26) against a fresh universal
-Release build (18 November 2026). Every check below runs at **two rasters**, 1280×720 and
+Release build (19 November 2026). Every check below runs at **two rasters**, 1280×720 and
 320×180, and the picture checks again on **Apple's software renderer** at 320×180. Audio is
 synthetic, fed through earshot's `feed()`; the device menu runs on earshot's scripted capture
 backend. **No step opens or lists a real audio device.**
@@ -184,9 +187,10 @@ backend. **No step opens or lists a real audio device.**
 | `--alpha` | output alpha against mix(clip alpha, 1, Mix) at Mix 0, 0.5, 1: **0.000 codes**; where the clip is clear the bare driver shows whatever the clip's colour |
 | `--resize` | 1280×720 → 960×540 after 60 frames: the trace unbroken, the next frame **0 codes** from a run at 960×540 throughout (on Apple's software renderer, within 0.001 codes: it is not bit-reproducible under load) |
 | `--fallback` | no input, bin 0 pulsing: the cone pumps, its strongest frequency **63 Hz**, **64 000** samples over 120 frames at 1/60 s, the lamp **amber**; the same with a millisecond host clock at 4.99e8; the top band alone moves it **1.8e-5** as much |
+| `--hostbins` | Resolume's 64 bins built as Arena 7.29.0 was measured to build them (2048-point Hann, 16 fine bins a bin, held 2048 samples), nothing fed, at 48 and 44.1 kHz: earshot reads them at the host's rate; a 100 Hz tone gives the 20–200 Hz band **√(180/375) = 0.6928** of bin 0's level to **4e-8** (0.7228 at 44.1 kHz), and bin 0's energy splits between it and the 200–800 Hz band with nothing lost (to 4e-7); the cone's 63 Hz stroke is the closed form's for that share to **0.2 %** (5.7 % of Xmech); every kick of a 128 BPM loop pumps it (17.7–19.5 % of Xmech), its hats alone **4.3e-6** as much; a rate of 0 keeps 48 kHz. Built against earshot 8124191 it fails 7 measurements |
 | `--devices` | scripted backend: the menu by name and key; Running and green, no stop hit; frames during a 300 ms open take **2.2–3.2 ms** more than the longest frame before it (≤ 100); Silent and steady red; a saved device that has gone is Missing and blinks, nothing opened in its place; Rescan reopens it by name |
 | `--pipe` | 2.5 frames in, exactly 2 out, with the track and with `--wav`; bad cues, settings and WAVs refused; a closed stdout (`\| head -c 1`) exits 1, not 141 |
-| `--negative` | **19** deliberately wrong models, **19** caught |
+| `--negative` | **22** deliberately wrong models, **22** caught |
 | mutation | **17** one-character mutants of the shipped GLSL and C++, **17** caught |
 | `tools/sweep.py` | all **19** sweepable controls measurably change the picture, with and without their contexts |
 | shaders | both compile through `glslc`, not merely through Apple's driver |
@@ -209,23 +213,32 @@ Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
   Input value at all (it was at its default, 0), while Driver and Channel are written as their
   values (`value="2"`, `value="1"`). So Arena hands the plugin, and keeps, the entry's value,
   which for a device is its name key. No real device was chosen.
-- **Resolume's FFT moves the cone, a little.** Re-tested on 19 November 2026 with the v0.1.0
-  release's own bundle, in a new composition, with Arena's demo loop `Beat 001.wav` (the sound
-  file) playing on the layer below, the Audio buffer on Composition and Audio Input on None
-  (host FFT). Read off the Height view's dust cap in 50 snapshots about a fifth of a second
-  apart, the cone peaked at **5.6% of Xmech** (1.5% RMS) at the default Drive (+18 dB) and FFT
-  Law (Linear Mag), 11.7% at +24 dB and 15.1% at +30 dB, the most Drive gives; at +18 dB, Log
-  Mag peaked at 7.3%, Linear Power at 14.2% and Log Power at 69% (25% RMS). With nothing
-  playing, and again once the loop was cleared, every snapshot was the rest code. The Lit view
-  changed over the driver in 29 of 29 snapshot pairs. Arena's quieter `Bass 001.wav` (−40 dBFS
-  RMS, 18 dB under Beat 001) moved it by less than the Height view's smallest step, even at
-  +30 dB. The first check (18 November) saw nothing because it played `Beat 001.mov`, which is
-  picture only: Arena's demo clips keep their sound in the matching `.wav` files.
+- **Resolume's FFT moves the cone, a little; in 0.1.1 by about 0.69 of what it did.** On
+  19 November 2026, an A/B: the v0.1.0 release's bundle, then 0.1.1's (the build `verify.sh`
+  checks, signed ad hoc), each in its own Arena launch and a new composition, with Arena's demo
+  loop `Beat 001.wav` (the sound file) playing on the layer below, the Audio buffer on
+  Composition and Audio Input on None (host FFT). Read off the Height view's dust cap in
+  snapshots about a fifth of a second apart, at the default Drive (+18 dB) and FFT Law (Linear
+  Mag, Arena's), the cone peaked at **9.9% of Xmech** (2.1% RMS, 100 snapshots) on 0.1.0 and
+  **3.9%** (1.05% RMS) on 0.1.1; at +24 dB 5.6% and 4.8%; at +30 dB, the most Drive gives, 18.6%
+  and 19.4%. Snapshots this sparse can't resolve a factor of 0.69 in one burst (the same 0.1.0
+  bundle peaked at 5.6% in a run of 50 earlier that day), so pooled over the three Drives, scaled
+  to +18 dB, 250 snapshots each: the RMS went from 1.63% to 1.12% of Xmech, **0.69** of it, where
+  `--hostbins` says 0.693. 0.1.1 logged `host audio at 48000 Hz: Resolume's FFT bins are 375 Hz
+  each` once. Under the laws Arena doesn't use, at +18 dB, 0.1.1 peaked at 13.4% (Linear Power),
+  11.7% (Log Mag) and 56% (Log Power). With nothing playing, and again once the loop was cleared,
+  every snapshot was the rest code (0.43%), on both; the Lit view changed over the driver in 19
+  of 19 snapshot pairs with the loop playing and in none once it was cleared. Arena's quieter
+  `Bass 001.wav` (−40 dBFS RMS, 18 dB under Beat 001) stayed within one step of the Height view
+  at +18 dB and peaked at 1.3% at +30 dB, on both. No microphone prompt appeared, no device was
+  opened, and no show or preference was written. The first check (18 November) saw nothing
+  because it played `Beat 001.mov`, which is picture only: Arena's demo clips keep their sound in
+  the matching `.wav` files.
 - **Arena's Audio setting decides what it hears.** On Composition woofer hears every clip in the
   composition; on Local only the clip it is on, so over the still it stayed at rest; on External
   (Arena's own audio input) it stayed at rest too. On a clip carrying Beat 001's sound in its own
-  file, with nothing else playing, Local and Composition both moved it (peaks of 5.6%) and
-  External didn't. No microphone prompt appeared and no device was opened.
+  file, with nothing else playing, Local and Composition both moved it (peaks of 5.6%, v0.1.0)
+  and External didn't. No microphone prompt appeared and no device was opened.
 - **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
   the release workflow built from this source: the fleet's Arena gate passed 9 checks, failed none and
   skipped 2. It loads, registers as `WF01`, an effect, shows all 28 controls with the declared
@@ -244,11 +257,12 @@ Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
 - **No live audio device** has been opened, by woofer or by earshot. The device menu, the
   states and the lamp are proved on a scripted backend.
 - **The fallback is uncalibrated.** At the default Drive a band level of 1 in Resolume's FFT
-  drives the cone onto the stop; Arena's demo drum loop at its own level (−22 dBFS RMS) gave
-  peaks of 5.6% of Xmech under Linear Mag and 69% under Log Power, and what a full mix gives is
-  unknown. A band level
-  above 1 is taken as 1, and under the two Linear laws the bass band (the 63 Hz sine) reads a
-  single bin, Resolume's lowest.
+  drives the cone onto the stop; Arena's demo drum loop at its own level (−22 dBFS RMS) puts a
+  mean of 0.02 and a peak of 0.11 in Resolume's lowest bin and gave peaks of about 4% of Xmech,
+  and what a full mix gives is unknown. A band level above 1 is taken as 1. Resolume's lowest
+  bin spans 0–375 Hz, so the kick, the bass line and the low toms arrive as one number; the bass
+  band (the 63 Hz sine) takes 180/375 of its energy and the next band the rest (in v0.1.0 the
+  bass band took all of it).
 - **The audio analysis costs CPU it does not use**: about 0.5 ms a frame on the render thread
   (onsets, pitch and tempo, which woofer never reads), with no switch in this version.
 - **The Height view can flash** with loud music: over three flashes a second over large areas
