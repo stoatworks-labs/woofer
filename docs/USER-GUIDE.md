@@ -30,10 +30,10 @@ card, 5.5 seconds into its track of kicks, hats and a bass note.*
 > In Resolume it has run only on one layer over a still: in Arena 7.29.0 on a Mac, and in Arena
 > 7.27.1 on Windows on software rendering. There it registers, shows its controls with the
 > declared defaults and renders, and every control that acts on a still cone changes the
-> picture. **In Arena on the Mac, Resolume's own spectrum didn't move the cone at all** (see
+> picture. **In Arena on the Mac, Resolume's own spectrum moves the cone with music playing, but
+> only a little at the default Drive** (see
 > [Where the audio comes from](#where-the-audio-comes-from)), and **no live audio input has ever
-> been opened**, so the cone has never yet moved to music inside Resolume. It has **never been
-> in a show**. The cone's shape, its breakup and how hard the stop is are chosen, not measured
+> been opened**. It has **never been in a show**. The cone's shape, its breakup and how hard the stop is are chosen, not measured
 > (see [Known limits](#known-limits)). Try it on a spare layer, with your input, before you put
 > it in a show.
 >
@@ -77,13 +77,15 @@ it trips SmartScreen once: **More info** → **Run anyway**. Or skip the install
    right.
 2. **Give it music.** With **Audio Input** at **None (host FFT)**, the default, woofer listens
    to Resolume's own spectrum of the composition's audio (the **Audio** control picks which
-   audio, as on any Resolume effect). Play a clip or a deck with sound and the cone should pump
-   on the bass, but in the one Arena it has been tried in, on a Mac, it didn't move at all: see
-   [Where the audio comes from](#where-the-audio-comes-from). For the real thing, pick an input
+   audio, as on any Resolume effect). Play a clip with sound and the cone pumps on the bass,
+   though at the default Drive only a little: on Arena's demo drum loop, about 6% of its stroke
+   at the peaks (see [Where the audio comes from](#where-the-audio-comes-from)). Turn **Drive**
+   up, or try another **FFT Law**, for more. For the real thing, pick an input
    by name in **Audio Input**: woofer then drives the cone with that input's waveform, and the
    lamp turns green.
-3. **Drive** is the amplifier. At the default, +18 dB, a kick in Resolume's quiet demo stems
-   moves the sub about a sixth of the way to its stop, and a loud master about 40% of the way.
+3. **Drive** is the amplifier. At the default, +18 dB, a kick in Resolume's quiet demo stems,
+   fed as an input feeds it, moves the sub about a sixth of the way to its stop (on Resolume's
+   own spectrum, about 6%), and a loud master about 40% of the way.
    Turn it up until the lamp flashes white on the loudest hits: that's the coil hitting its stop.
 4. Try **Driver** at **10 cm Full-range**: a small, light cone with a higher resonance, set from
    its own datasheet like the others.
@@ -193,12 +195,20 @@ demo](https://woofer-demo.stoatworks-labs.com/) opens on the Lit view.
   but **it can't show the music's waveform** (two kicks of different pitch look the same), **its
   level isn't calibrated** (**FFT Law** chooses how Resolume's numbers are read, and a band above
   1 is taken as 1), and **it steps once a frame**, so unlike an input it depends on the frame rate.
-  **In Arena 7.29.0 on a Mac, it didn't move the cone.** With Arena's own demo clip Beat 001
-  playing on the layer below, the cone stayed at rest (under half a per cent of its stroke, the
-  Height view's smallest step) under all four **FFT Law**s, the same as with nothing playing,
-  in two runs. Whether Arena's spectrum was empty on that Mac's audio set-up, or the levels in
-  it were too small to move the cone at +18 dB, wasn't found out. If the cone sits still on
-  None (host FFT) with music playing, turn **Drive** up or pick an input.
+  **In Arena 7.29.0 on a Mac it moves the cone, but not far.** With Arena's demo drum loop
+  `Beat 001.wav` playing on the layer below, the cone's peaks were about 6% of its stroke at the
+  default Drive (+18 dB) and **FFT Law** (Linear Mag), 12% at +24 dB and 15% at +30 dB; at
+  +18 dB, Log Mag gave 7%, Linear Power 14% and Log Power 69%. A quieter clip (Arena's
+  `Bass 001.wav`, 18 dB down) barely moved it. If the cone hardly moves on None (host FFT) with
+  music playing, turn **Drive** up, try another **FFT Law**, or pick an input.
+
+**Resolume's Audio setting.** Resolume adds its own **Audio** control to woofer, as to any effect
+that reads its spectrum, with three choices. **Composition** (the default) hears every clip
+playing in the composition. **Local** hears only the clip woofer is on: on a clip with its own
+sound track, that sound; over a picture-only clip, nothing. **External** hears Resolume's own
+audio input (Resolume's Preferences, under Audio), which in the Mac test heard nothing. A clip
+only has sound if its file has a sound track: Resolume's demo `.mov` clips are picture only, and
+their sound is in the matching `.wav` files, so play the `.wav` on a layer of its own.
 
 **Channel** takes the left, the right or both (summed) from an input.
 
@@ -316,8 +326,9 @@ in this version. Nothing was timed inside Resolume, and nothing was timed on Win
 ## If it looks wrong
 
 **The cone doesn't move.** No audio is reaching it. On **None (host FFT)**, check the **Audio**
-control's source is playing something; the lamp is amber. In Arena on a Mac, Resolume's spectrum
-didn't move the cone even with a clip playing; pick an input instead. On an input, the lamp says why: steady
+control's source is playing something; the lamp is amber. **Composition** hears every clip,
+**Local** only the clip woofer is on, **External** only Resolume's audio input; a Resolume demo
+`.mov` clip has no sound (play its `.wav`). On an input, the lamp says why: steady
 red is silence (on a Mac, often Resolume's microphone permission), blinking red a device that
 isn't there. Or Drive is too low for the track: turn it up.
 
@@ -348,8 +359,8 @@ Windows  %LOCALAPPDATA%\woofer\logs\woofer.YYYY-MM-DD.log
 - **Run in Resolume only briefly**, on one layer over a still, in Arena 7.29.0 on a Mac and
   7.27.1 on Windows (software rendering, no sound device): it loads, registers and shows its
   controls as declared, and the controls that act on a still cone change the picture. **The cone
-  has never moved to music inside Resolume**: Resolume's spectrum didn't move it on the Mac, and
-  no input was opened. Nothing is known about a whole show, or how it performs inside Resolume.
+  has moved to music inside Resolume only on Resolume's own spectrum**, with Arena's demo stems,
+  on the Mac, and only a little at the default Drive; no input was opened. Nothing is known about a whole show, or how it performs inside Resolume.
 - **The Audio Input menu works by value**, as it was built to: Arena reads back and saves the
   chosen entry's value (the device's name key), not its place in the list. Checked with a spare
   "(none)" entry, which opened nothing; a real device was never chosen.

@@ -14,8 +14,9 @@ Silicon, macOS 26) against a fresh universal Release build: every check at 1280x
 negative controls, 17 of 17 mutants, 19 of 19 controls alive in the sweep, oxbow reading and
 rendering the bundle with devices disabled. **In Resolume only briefly** (2026-11-18): Arena
 7.29.0 on this Mac over REST (registers, 28 parameters, Mix 0 is the still; Audio Input is a
-value, not an index; Resolume's Composition FFT did not move the cone at all with Beat 001
-playing, under every FFT Law, twice) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
+value, not an index; Resolume's Composition FFT moves the cone with `Beat 001.wav` playing below:
+peaks of 5.6% of Xmech at +18 dB Linear Mag, 15.1% at +30 dB, 69% under Log Power, re-tested
+2026-11-19; the 2026-11-18 run heard nothing because `Beat 001.mov` has no audio stream) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
 0 failed, 2 skipped; `plugin-bench/arena/expect/woofer.json`). README "In Resolume" has the
 detail. **No live audio device ever opened**, by woofer or by earshot.
 earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `8124191`, unpatched.
@@ -239,8 +240,8 @@ side; the breakup modes' frequencies (read by eye off response plots), shapes, Q
 participation; B&C's Xmech (23 mm, not printed); the bare materials' reflectances; that
 Resolume's FFT levels are anywhere near 0..1 for music.
 
-Not done: a live device; music moving the cone inside Resolume (its FFT gave the fallback
-nothing on this Mac, cause not found); presets, an OpenFX port. Windows is built by CI (MSVC,
+Not done: a live device; music inside Resolume beyond Arena's demo stems on its FFT (which
+moves the cone, a little at the default Drive: README "In Resolume"); presets, an OpenFX port. Windows is built by CI (MSVC,
 no warnings in woofer or earshot) and gated in Arena on win-lab; the user guide is
 docs/USER-GUIDE.md and the browser demo is demo/.
 
@@ -319,7 +320,9 @@ more clearly. Audio Input and Rescan Inputs are not swept (no device may be touc
   clamps, a composition will not find its device by name. Unverifiable without a host.
 - **What do Resolume's FFT bins hold for music?** The fallback assumes levels near 0..1; at the
   default Drive a level of 1 puts the 30 cm on the stop. FFT Law is exposed because nobody has
-  measured the bins.
+  measured the bins. On Arena's Beat 001 (−22 dBFS RMS) the default Drive and law gave peaks of
+  only 5.6% of Xmech, and Log Power 69% (2026-11-19): a stem sits well under 1 there. Whether the
+  default law or Drive should change for the fallback is open.
 - **Is +18 dB the right default Drive?** It suits stems and a −12 dBFS loopback; a −8 dBFS
   master will hit the stop on most kicks (physical, and loud).
 - **Should earshot offer a tap-only mode?** About 0.5 ms a frame of analysis woofer ignores.
