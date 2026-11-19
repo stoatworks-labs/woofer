@@ -35,15 +35,15 @@ card, 5.5 s into its track of kicks, hats and a bass note (`--frames 330`).</sub
 
 ## Download
 
-**[v0.1.0](https://github.com/stoatworks-labs/woofer/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+**[v0.1.1](https://github.com/stoatworks-labs/woofer/releases/tag/v0.1.1)** — prebuilt for macOS and Windows. Pick your platform:
 
 <details>
 <summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`woofer-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/woofer/releases/download/v0.1.0/woofer-0.1.0-macos-universal.dmg) | 585 KB |
-| Universal (Apple Silicon + Intel) · .zip archive | [`woofer-macos-universal.zip`](https://github.com/stoatworks-labs/woofer/releases/latest/download/woofer-macos-universal.zip) | 522 KB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`woofer-0.1.1-macos-universal.dmg`](https://github.com/stoatworks-labs/woofer/releases/download/v0.1.1/woofer-0.1.1-macos-universal.dmg) | 590 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`woofer-macos-universal.zip`](https://github.com/stoatworks-labs/woofer/releases/latest/download/woofer-macos-universal.zip) | 523 KB |
 
 </details>
 
@@ -52,8 +52,8 @@ card, 5.5 s into its track of kicks, hats and a bass note (`--frames 330`).</sub
 
 | Build | Download | Size |
 | --- | --- | --- |
-| x64 · .exe installer | [`woofer-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/woofer/releases/download/v0.1.0/woofer-0.1.0-windows-x86_64-setup.exe) | 354 KB |
-| x64 · .zip archive | [`woofer-windows-x86_64.zip`](https://github.com/stoatworks-labs/woofer/releases/latest/download/woofer-windows-x86_64.zip) | 242 KB |
+| x64 · .exe installer | [`woofer-0.1.1-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/woofer/releases/download/v0.1.1/woofer-0.1.1-windows-x86_64-setup.exe) | 357 KB |
+| x64 · .zip archive | [`woofer-windows-x86_64.zip`](https://github.com/stoatworks-labs/woofer/releases/latest/download/woofer-windows-x86_64.zip) | 243 KB |
 
 </details>
 
@@ -234,14 +234,19 @@ Render cost: see [AGENTS.md](AGENTS.md#cost). macOS only.
   opened, and no show or preference was written. The first check (18 November) saw nothing
   because it played `Beat 001.mov`, which is picture only: Arena's demo clips keep their sound in
   the matching `.wav` files.
+- **The v0.1.1 release's own bundle** (Developer ID-signed and notarised, `spctl` accepted), in a
+  third launch after the tag, the same probe: a peak of **3.9%** of Xmech (1.0% RMS) at the
+  default Drive and FFT Law, 0.70 of v0.1.0's RMS pooled over the three Drives, the rest code with
+  nothing playing before and after, `host audio at 48000 Hz` logged once, and no show or
+  preference written.
 - **Arena's Audio setting decides what it hears.** On Composition woofer hears every clip in the
   composition; on Local only the clip it is on, so over the still it stayed at rest; on External
   (Arena's own audio input) it stayed at rest too. On a clip carrying Beat 001's sound in its own
   file, with nothing else playing, Local and Composition both moved it (peaks of 5.6%, v0.1.0)
   and External didn't. No microphone prompt appeared and no device was opened.
-- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
-  the release workflow built from this source: the fleet's Arena gate passed 9 checks, failed none and
-  skipped 2. It loads, registers as `WF01`, an effect, shows all 28 controls with the declared
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the v0.1.1
+  release's own x64 DLL (v0.1.0's gave the same): the fleet's Arena gate passed 9 checks, failed
+  none and skipped 2. It loads, registers as `WF01`, an effect, shows all 28 controls with the declared
   name, order, type, range and default, renders, and 10 controls move a still cone's picture.
   The 11 that act only on a moving cone are skipped there (no sound device), and Rescan Inputs
   and Status Lamp (an LED too small for the gate's thumbnail) are recorded inert. Arena's log

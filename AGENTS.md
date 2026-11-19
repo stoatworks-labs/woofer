@@ -19,8 +19,9 @@ rendering the bundle with devices disabled. **In Resolume only briefly** (2026-1
 value, not an index; Resolume's Composition FFT moves the cone with `Beat 001.wav` playing below:
 an A/B on 2026-11-19, a launch each, at +18 dB Linear Mag peaks of 9.9% of Xmech on v0.1.0's
 bundle and 3.9% on 0.1.1's, and pooled over three Drives the RMS 0.69 of 0.1.0's where
-`--hostbins` says 0.693; 0.1.1 logs `host audio at 48000 Hz`; the 2026-11-18 run heard nothing
-because `Beat 001.mov` has no audio stream) and Arena 7.27.1 on win-lab (the fleet's gate: 9 passed,
+`--hostbins` says 0.693, and the notarised release bundle after the tag 3.9% and 0.70; 0.1.1 logs
+`host audio at 48000 Hz`; the 2026-11-18 run heard nothing
+because `Beat 001.mov` has no audio stream) and Arena 7.27.1 on win-lab (the fleet's gate on 0.1.1's release DLL, as on 0.1.0's: 9 passed,
 0 failed, 2 skipped; `plugin-bench/arena/expect/woofer.json`). README "In Resolume" has the
 detail. **No live audio device ever opened**, by woofer or by earshot.
 earshot is a snapshot of `github.com/stoatworks-labs/earshot` at `02306da`, unpatched.
