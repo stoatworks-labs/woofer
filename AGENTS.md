@@ -240,7 +240,10 @@ there is no switch to turn it off.
   upstream in 02306da (bins shared by overlap, Arena's measured law the default), taken in 0.1.1.
 - **`configure()` waits for the next `update()`, and `config()` returns the applied config**:
   two configures in one frame and the first is lost, so woofer sends FFT Law and the host's
-  rate in one.
+  rate in one (eidophone lost its rate this way). `--hostbins` changes both in one frame, twice,
+  each time to a rate that isn't earshot's default 48 kHz (a test ending on 48 kHz passes against
+  the bug: the lost rate falls back to the default); built on purpose with two configures it
+  fails both.
 - **Host band levels are not bounded by 1** (they are root-sum-squares of bins): woofer clamps.
 - **`update()` runs all the analysis** (thirds, onsets, pitch, tempo) whatever the consumer
   reads: ~0.5 ms a frame on the render thread for a plugin that wants only the tap.

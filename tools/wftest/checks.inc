@@ -1296,6 +1296,44 @@ int runHostFft( const HarnessPerturb& hp )
 				                                    loopPeak > 0.0 ? all / loopPeak : HUGE_VAL ) );
 		}
 	}
+	//(c) FFT Law and the host's rate changed in the SAME frame: earshot applies a
+	//pending config at the next update() and config() is the applied one, so a
+	//second configure built from config() would undo the first (eidophone's
+	//trap). Log Power and 44.1 kHz from the first frame (the law's first
+	//configure and the rate's in one frame), held for a second; then Linear Mag
+	//and 96 kHz (a host's, if not Arena's) in one frame. Neither rate is
+	//earshot's default 48 kHz, so either one lost shows.
+	{
+		Physics ph;
+		setup( ph, { kDefaultPreset, 0.707, 0.0, driveDb }, hp );
+		const auto tone = []( double s ) { return 0.25 * fadeIn( s, 0.5 ) * std::sin( 2.0 * kPi * 100.0 * s ); };
+		HostSpectrum h44( 44100, tone ), h96( 96000, tone );
+		ph.Set( PT_FFT_LAW, static_cast< float >( FftLaw::LogPower ) );
+		ph.plugin->SetSampleRate( 44100u );
+		for( int f = 0; f < 60; ++f )
+			hostStep( ph, h44 );
+		const double before44 = ph.plugin->AudioForTest().Frame().bands[ 0 ].level / h44.bins[ 0 ];
+		const double rate44   = ph.plugin->AudioForTest().HostRateForTest();
+		Check( std::fabs( rate44 - 44100.0 ) < 1e-9,
+		       fmt( "FFT Law (Log Power) and the host's rate (44100 Hz) from the first frame: earshot at %.0f Hz a second later (want 44100)", rate44 ) );
+		ph.Set( PT_FFT_LAW, static_cast< float >( FftLaw::LinearMagnitude ) );
+		ph.plugin->SetSampleRate( 96000u );
+		const double share = 180.0 / 750.0;
+		double worst = 0.0;
+		for( int f = 0; f < 120; ++f )
+		{
+			hostStep( ph, h96 );
+			if( f < 60 )
+				continue;
+			const double l0 = ph.plugin->AudioForTest().Frame().bands[ 0 ].level;
+			worst = std::max( worst, std::fabs( l0 / h96.bins[ 0 ] / std::sqrt( share ) - 1.0 ) );
+		}
+		const double hostRate = ph.plugin->AudioForTest().HostRateForTest();
+		Check( std::fabs( hostRate - 96000.0 ) < 1e-9 && worst <= 1e-3,
+		       fmt( "FFT Law (Log Power to Linear Mag) and the host's rate (44100 to 96000 Hz) changed in one frame: both land, earshot at %.0f Hz "
+		            "and the 20-200 Hz band at sqrt(180/750) = %.4f of bin 0's (worst %.1e off; %.4f of it before, under Log Power at 44.1 kHz)",
+		            hostRate, std::sqrt( share ), worst, before44 ) );
+	}
 	//A rate no engine runs at is not one: earshot keeps its 48 kHz.
 	{
 		Physics ph;
