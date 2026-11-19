@@ -1,8 +1,8 @@
 earshot snapshot for woofer
 
 Source:   https://github.com/stoatworks-labs/earshot
-Commit:   8124191 (estest: a negative control for every check, enforced)
-Taken:    2026-11-16, with `git archive 8124191`, unmodified.
+Commit:   02306da (Host bins: share each bin by overlap; Arena's measured law as default (0.1.1))
+Taken:    2026-11-19, with `git archive 02306da`, unmodified.
 Patches:  none.
 
 Do not edit files here; change earshot upstream and take a new snapshot.

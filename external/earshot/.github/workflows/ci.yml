@@ -1,0 +1,181 @@
+name: ci
+
+# earshot's harness on every push and pull request, on the three targets the
+# plugins that vendor it ship for: macOS arm64, macOS x86_64 and Windows x64
+# under MSVC. There is no Linux job: no plugin ships for Linux, though the
+# library has an ALSA path through miniaudio.
+#
+# Nothing here opens an audio device, and nothing needs one. estest drives the
+# capture logic through a scripted backend (include/earshot/testing.h), and the
+# runners have no microphone anyway. Live capture is `estest --live`, by hand,
+# and has never been run (README, Status).
+#
+# What stays on the dev Mac, in tools/verify.sh: the mutation test (fifteen
+# rebuilds), the build with -ffp-contract=off, and the tempo on pattern's
+# release-video soundtrack, which is not in this repo.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos-arm64:
+    name: macOS (universal build, arm64 run)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        # Universal, as a plugin's release build is: the x86_64 slice has to
+        # link here even though it runs in the next job. The value is quoted,
+        # or the shell splits it at the semicolon.
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Both slices
+        # Captured and matched with `case`, never `| grep -q`: under
+        # `bash -eo pipefail` a grep that finds its match early can fail the
+        # step through SIGPIPE.
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in build/libearshot.a build/tools/estest/estest; do
+            archs=$( lipo -archs "$f" )
+            case "$archs" in
+              *arm64*x86_64*|*x86_64*arm64*) echo "  ok: $f [$archs]" ;;
+              *) echo "::error::$f is [$archs], not universal"; exit 1 ;;
+            esac
+          done
+
+      - name: estest
+        # Every group in every cell (44.1 and 48 kHz, blocks of 128 and 1031).
+        timeout-minutes: 20
+        run: ./build/tools/estest/estest
+
+      - name: Negative controls
+        # Every check must fail under its planted defect, and every check must
+        # have one. A check that cannot fail is not checking anything.
+        timeout-minutes: 30
+        run: ./build/tools/estest/estest --negative
+
+      - name: WAV round trip
+        run: ./build/tools/estest/estest --write-wav "$RUNNER_TEMP/roundtrip.wav"
+
+      - name: Without capture (EARSHOT_CAPTURE=OFF)
+        # The library must still build and analyse fed audio with miniaudio
+        # left out entirely.
+        run: |
+          cmake -S . -B build-nocapture -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DEARSHOT_CAPTURE=OFF
+          cmake --build build-nocapture --config Release --parallel
+          ./build-nocapture/tools/estest/estest --fft --silent --fallback --params
+
+      - name: The consumer (add_subdirectory into a MODULE)
+        # earshot pulled in exactly as a plugin pulls it in, built into a
+        # loadable module, loaded by a host at run time, asked for the pitch
+        # of a 440 Hz sine. The module must export its own entry and nothing
+        # of earshot's (hidden visibility), or two plugins in one host would
+        # share one copy's symbols.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S tools/consumer -B build-consumer -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+          cmake --build build-consumer --config Release --parallel
+          ./build-consumer/consumer-host
+          mod=$( ls build-consumer/libFakePlugin.* )
+          exports=$( nm -gU "$mod" | awk '{print $3}' | sort -u | tr '\n' ' ' )
+          [ "$exports" = "_fakePluginPitch " ] || { echo "::error::the module exports: $exports"; exit 1; }
+          echo "  ok: exports $exports"
+
+      - name: Capture devices (enumerate only, informational)
+        # Lists what miniaudio's CoreAudio backend sees and opens nothing. The
+        # runner has no microphone but does list two virtual devices ("Apple
+        # Virtual Sound Device", "Null Audio Device"). Informational: it judges
+        # nothing, and listDevices() is silent about failing.
+        run: ./build/tools/estest/estest --devices || true
+
+  macos-x86_64:
+    name: macOS (x86_64, native)
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=x86_64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: estest
+        # On Intel hardware, not Rosetta: no fused multiply-add, the arithmetic
+        # MSVC and older Macs give the tolerances.
+        timeout-minutes: 20
+        run: ./build/tools/estest/estest
+
+      - name: Consumer
+        run: |
+          cmake -S tools/consumer -B build-consumer -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+          cmake --build build-consumer --config Release --parallel
+          ./build-consumer/consumer-host
+
+  windows:
+    name: Windows (x64, MSVC)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        # /W4 /permissive- on the library (CMakeLists.txt). needle's Windows CI
+        # compiled the library alone (e512e2b); this is the first MSVC build of
+        # the harness.
+        run: cmake --build build --config Release --parallel
+
+      - name: estest
+        timeout-minutes: 30
+        run: ./build/tools/estest/Release/estest.exe
+
+      - name: Negative controls
+        timeout-minutes: 45
+        run: ./build/tools/estest/Release/estest.exe --negative
+
+      - name: WAV round trip
+        run: ./build/tools/estest/Release/estest.exe --write-wav "$env:RUNNER_TEMP/roundtrip.wav"
+
+      - name: The consumer (add_subdirectory into a DLL)
+        # bash, not the default PowerShell: PowerShell judges a multi-line step
+        # by its last command only, so a failed configure would run on.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S tools/consumer -B build-consumer -A x64
+          cmake --build build-consumer --config Release --parallel
+          ./build-consumer/Release/consumer-host.exe
+
+      - name: Capture devices (enumerate only, informational)
+        # WASAPI through miniaudio, built by MSVC. The runner lists no input,
+        # and an empty list cannot tell "no inputs" from "the backend did not
+        # start" (listDevices() is silent about failing), so this judges
+        # nothing; it is a record of what the runner offered.
+        shell: bash
+        run: ./build/tools/estest/Release/estest.exe --devices || true
+
+      # Uploading is not only for the artefact. This repo has no package
+      # manifest, so github-actions is its only Dependabot ecosystem, and a
+      # bump to upload-artifact should be exercised by the check that gates it.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: estest-windows-x64
+          path: build/tools/estest/Release/estest.exe
+          if-no-files-found: error
+          retention-days: 7

@@ -1092,6 +1092,224 @@ int runFallback( const HarnessPerturb& hp )
 }
 
 //===========================================================================
+// --hostbins: Resolume's own FFT, earshot's host path alone, its bins built
+// the way Arena 7.29.0 was measured to build them (earshot's AGENTS.md,
+// "Resolume's 64 bins, measured") and handed to the plugin as its
+// FF_USAGE_FFT buffer, element by element, as a host does; nothing goes
+// through feed(). Under earshot 8124191 (bins read as linear to 22.05 kHz,
+// each given whole to the band holding its centre) the 20-200 Hz band got all
+// of bin 0, 0-375 Hz, and the cone was driven 1/0.693 as hard as its share.
+//===========================================================================
+
+/// Arena's FFT buffer as measured (snowglobe's sgtest, unchanged): every 2048
+/// samples of the engine's rate, a 2048-point Hann-windowed DFT of the newest
+/// 2048 samples, and bin k the sum of |X_i| / 2N over the 16 fine bins
+/// 16k .. 16k + 15. That is linear, fs / 128 a bin (375 Hz at 48 kHz) to
+/// fs / 2, a magnitude, a sine of amplitude A reading about A / 4 in its bin.
+/// Held between updates, as Arena holds it.
+struct HostSpectrum
+{
+	static constexpr int kN = 2048;
+	int rate;
+	std::function< double( double ) > signal;
+	std::vector< float > bins = std::vector< float >( 64, 0.0f );
+	int64_t updated           = -1;
+
+	HostSpectrum( int r, std::function< double( double ) > s ) : rate( r ), signal( std::move( s ) ) {}
+
+	const std::vector< float >& at( double t )
+	{
+		const int64_t u = static_cast< int64_t >( std::floor( t * rate / kN + 1e-9 ) );
+		if( u == updated )
+			return bins;
+		updated = u;
+		std::vector< Complex > x( kN );
+		for( int n = 0; n < kN; ++n )
+		{
+			const int64_t sample = u * kN - kN + n;
+			const double hann    = 0.5 - 0.5 * std::cos( 2.0 * kPi * n / kN );
+			x[ static_cast< size_t >( n ) ] = hann * signal( static_cast< double >( sample ) / rate );
+		}
+		//Radix-2, in place.
+		for( int i = 1, j = 0; i < kN; ++i )
+		{
+			int bit = kN >> 1;
+			for( ; j & bit; bit >>= 1 )
+				j ^= bit;
+			j ^= bit;
+			if( i < j )
+				std::swap( x[ static_cast< size_t >( i ) ], x[ static_cast< size_t >( j ) ] );
+		}
+		for( int len = 2; len <= kN; len <<= 1 )
+		{
+			const Complex w = std::polar( 1.0, -2.0 * kPi / len );
+			for( int i = 0; i < kN; i += len )
+			{
+				Complex wk( 1.0, 0.0 );
+				for( int k = 0; k < len / 2; ++k )
+				{
+					const Complex a = x[ static_cast< size_t >( i + k ) ], b = x[ static_cast< size_t >( i + k + len / 2 ) ] * wk;
+					x[ static_cast< size_t >( i + k ) ]           = a + b;
+					x[ static_cast< size_t >( i + k + len / 2 ) ] = a - b;
+					wk *= w;
+				}
+			}
+		}
+		for( int k = 0; k < 64; ++k )
+		{
+			double sum = 0.0;
+			for( int i = 16 * k; i < 16 * k + 16; ++i )
+				sum += std::abs( x[ static_cast< size_t >( i ) ] );
+			bins[ static_cast< size_t >( k ) ] = static_cast< float >( sum / ( 2.0 * kN ) );
+		}
+		return bins;
+	}
+};
+
+/// One frame of the host: its bins into the Audio buffer, then the frame.
+void hostStep( Physics& ph, HostSpectrum& host )
+{
+	const std::vector< float >& b = host.at( ph.frame / ph.fps );
+	for( unsigned int e = 0; e < 64; ++e )
+		ph.plugin->SetParamElementValue( PT_AUDIO, e, b[ e ] );
+	ph.Step();
+}
+
+/// 128 BPM (Arena's Beat 001), so the kicks fall at every phase of the host's
+/// 2048-sample updates: wftest's kick on every beat, and its hat (high-passed
+/// at 7 kHz, so it puts nothing in bin 0) on the eighths between.
+constexpr double kHostBeat = 60.0 / 128.0;
+double hostLoopAt( double t, bool kicks )
+{
+	if( t < 0.0 )
+		return 0.0;
+	double s = 0.25 * hatAt( std::fmod( t + kHostBeat / 2.0, kHostBeat ) );
+	if( kicks )
+		s += 0.8 * kickAt( std::fmod( t, kHostBeat ) ) / kickPeak();
+	return s;
+}
+
+int runHostFft( const HarnessPerturb& hp )
+{
+	std::printf( "\n=== hostbins: Resolume's FFT alone, its 64 bins built as Arena 7.29.0 was measured to build them (2048-point Hann, 16 fine bins a bin,\n"
+	             "    held for 2048 samples), nothing fed, at 48 and 44.1 kHz: earshot reads the bins at the host's rate; the 20-200 Hz band (the 63 Hz\n"
+	             "    sine) takes 180 Hz of bin 0's span, the 200-800 Hz band the rest above 200 Hz; the cone's 63 Hz stroke is the closed form's for\n"
+	             "    that share; every kick of a 128 BPM loop pumps the cone and its hats alone don't\n"
+	             "    (the share to 1e-3, float arithmetic on the same bins; the split and the stroke to 1 %%: the 1 s DFT of a non-integer\n"
+	             "    frequency and the 400 Hz band's leakage are under 0.2 %%, and 8124191's rule is 44 %% off; the loop's hats: 1 %%)\n" );
+	const int before    = g_failures;
+	const Truth t       = truthOf( kDefaultPreset, 0.707 );
+	const double driveDb = 18.0;
+	const double volts  = voltsPerUnit( kDefaultPreset ) * std::pow( 10.0, driveDb / 20.0 );
+	const double hz0    = std::sqrt( 20.0 * 200.0 );//the band's sine, as Audio.cpp makes it
+	for( int rate : { 48000, 44100 } )
+	{
+		if( stopEarly() )
+			break;
+		const double binHz = rate / 128.0;
+		const double share = 180.0 / binHz;//20-200 Hz of bin 0's [0, binHz)
+		//(a) A steady 100 Hz tone: all of it in bin 0, all of it in band 0.
+		{
+			Physics ph;
+			setup( ph, { kDefaultPreset, 0.707, 0.0, driveDb }, hp );
+			ph.Set( PT_FFT_LAW, 0.0f );
+			ph.plugin->SetSampleRate( static_cast< unsigned int >( rate ) );
+			HostSpectrum host( rate, []( double s ) { return 0.25 * fadeIn( s, 0.5 ) * std::sin( 2.0 * kPi * 100.0 * s ); } );
+			const int frames = 4 * 60;
+			double worstShare = 0.0, worstSplit = 0.0, level0 = 0.0, bin0 = 0.0;
+			int counted = 0;
+			for( int f = 0; f < frames; ++f )
+			{
+				hostStep( ph, host );
+				if( f < frames - 60 )
+					continue;
+				const earshot::Frame& fr = ph.plugin->AudioForTest().Frame();
+				const double b0 = host.bins[ 0 ], l0 = fr.bands[ 0 ].level, l1 = fr.bands[ 1 ].level;
+				worstShare = std::max( worstShare, std::fabs( l0 / b0 / std::sqrt( share ) - 1.0 ) );
+				worstSplit = std::max( worstSplit, std::fabs( ( l0 * l0 + l1 * l1 ) / ( b0 * b0 ) / ( ( binHz - 20.0 ) / binHz ) - 1.0 ) );
+				level0 += l0;
+				bin0 += b0;
+				++counted;
+			}
+			level0 /= counted;
+			bin0 /= counted;
+			const double hostRate = ph.plugin->AudioForTest().HostRateForTest();
+			Check( std::fabs( hostRate - rate ) < 1e-9, fmt( "%d Hz: the host says %d Hz and earshot reads its bins at %.0f Hz (%.2f Hz a bin)", rate, rate,
+			                                                 hostRate, binHz ) );
+			Check( worstShare <= 1e-3, fmt( "%d Hz, a 100 Hz tone: the 20-200 Hz band's level is sqrt(180/%.2f) = %.4f of bin 0's in every frame of the last "
+			                                "second (worst %.1e off; 8124191 gave it 1)",
+			                                rate, binHz, std::sqrt( share ), worstShare ) );
+			Check( worstSplit <= 0.01, fmt( "%d Hz: bin 0 split between the 20-200 and 200-800 Hz bands, nothing lost or counted twice: their energies sum to "
+			                                "%.4f of the bin's (want %.4f, the bin less its 0-20 Hz; worst %.1e off)",
+			                                rate, ( binHz - 20.0 ) / binHz, ( binHz - 20.0 ) / binHz, worstSplit ) );
+			const size_t n    = DriverModel::kTapRate;
+			const double got  = std::abs( dftBin( ph.x, ph.x.size() - n, n, hz0, DriverModel::kTapRate ) );
+			const double want = std::abs( closedFormOf( t, hz0 ) ) * volts * std::sqrt( share ) * bin0;
+			Check( std::fabs( got / want - 1.0 ) <= 0.01,
+			       fmt( "%d Hz: the cone's %.1f Hz stroke %.4f mm, the closed form's for the band's share of bin 0 at +%.0f dB %.4f mm (%.4f; within 1 %%), "
+			            "%.1f %% of Xmech: %.3f of what bin 0 whole would drive",
+			            rate, hz0, got * 1e3, driveDb, want * 1e3, got / want, 100.0 * got / t.xmech, std::sqrt( share ) ) );
+		}
+		//(b) The loop: every kick pumps the cone; at 48 kHz, its hats alone don't.
+		double loopPeak = 0.0;
+		for( bool kicks : { true, false } )
+		{
+			if( !kicks && rate != 48000 )
+				continue;
+			Physics ph;
+			setup( ph, { kDefaultPreset, 0.707, 0.0, driveDb }, hp );
+			ph.Set( PT_FFT_LAW, 0.0f );
+			ph.plugin->SetSampleRate( static_cast< unsigned int >( rate ) );
+			HostSpectrum host( rate, [ kicks ]( double s ) { return hostLoopAt( s, kicks ); } );
+			const int frames = 7 * 60;
+			for( int f = 0; f < frames; ++f )
+				hostStep( ph, host );
+			//Trace sample i is at about i / kTapRate s (the fallback counts
+			//samples off the clock). Beats 3.. whose whole window is inside 7 s.
+			std::vector< double > peaks;
+			double all = 0.0;
+			for( int k = 3;; ++k )
+			{
+				const size_t from = static_cast< size_t >( std::llround( k * kHostBeat * DriverModel::kTapRate ) );
+				const size_t to   = static_cast< size_t >( std::llround( ( k + 1 ) * kHostBeat * DriverModel::kTapRate ) );
+				if( to > ph.x.size() )
+					break;
+				double p = 0.0;
+				for( size_t i = from; i < to; ++i )
+					p = std::max( p, std::fabs( ph.x[ i ] ) );
+				peaks.push_back( p );
+				all = std::max( all, p );
+			}
+			if( kicks )
+			{
+				loopPeak       = all;
+				double least   = HUGE_VAL;
+				for( double p : peaks )
+					least = std::min( least, p );
+				Check( !peaks.empty() && all >= 0.01 * t.xmech && least >= 0.5 * all,
+				       fmt( "%d Hz, kicks and hats at 128 BPM: every one of %zu beats pumps the cone, the least %.1f %% of Xmech, the most %.1f %% "
+				            "(each >= half the most, the most >= 1 %%)",
+				            rate, peaks.size(), 100.0 * least / t.xmech, 100.0 * all / t.xmech ) );
+			}
+			else
+				Check( all <= 0.01 * loopPeak, fmt( "%d Hz, the hats alone: the cone's peak %.2e mm, %.1e of the loop's (<= 1 %%)", rate, all * 1e3,
+				                                    loopPeak > 0.0 ? all / loopPeak : HUGE_VAL ) );
+		}
+	}
+	//A rate no engine runs at is not one: earshot keeps its 48 kHz.
+	{
+		Physics ph;
+		setup( ph, { kDefaultPreset, 0.707, 0.0, driveDb }, hp );
+		ph.plugin->SetSampleRate( 0u );
+		ph.Step();
+		ph.Step();
+		const double hostRate = ph.plugin->AudioForTest().HostRateForTest();
+		Check( std::fabs( hostRate - 48000.0 ) < 1e-9, fmt( "a host rate of 0: earshot keeps %.0f Hz (want 48000)", hostRate ) );
+	}
+	return g_failures == before ? 0 : 1;
+}
+
+//===========================================================================
 // --devices
 //===========================================================================
 bool lampIs( const double got[ 4 ], double r, double g, double b, double slack = 2.0 )
@@ -1297,7 +1515,7 @@ const std::vector< CheckEntry >& checks()
 		{ "framerate", runFramerate, true },     { "pumping", runPumping, true },     { "flattop", runFlattop, true },
 		{ "drift", runDrift, true },             { "surround", runSurround, true },   { "rest", runRest, false },
 		{ "magnify", runMagnify, false },        { "alpha", runAlpha, false },        { "resize", runResize, false },
-		{ "fallback", runFallback, false },      { "devices", runDevices, false },
+		{ "fallback", runFallback, false },      { "hostbins", runHostFft, true },     { "devices", runDevices, false },
 	};
 	return list;
 }
@@ -1349,6 +1567,10 @@ int runNegative( bool offlineOnly = false )
 	add( "resize", runResize, "a new raster resets the driver", []( HarnessPerturb& p ) { p.resetOnResize = true; } );
 	add( "fallback", runFallback, "the fallback reads the (empty) tap", []( HarnessPerturb& p ) { p.fallbackFromTap = true; } );
 	add( "fallback", runFallback, "a millisecond host clock read as seconds", []( HarnessPerturb& p ) { p.clockAsSeconds = true; } );
+	add( "hostbins", runHostFft, "Resolume's bins filed whole under the band holding each one's centre (earshot 8124191's rule)",
+	     []( HarnessPerturb& p ) { p.hostCentreOnly = true; } );
+	add( "hostbins", runHostFft, "the host's sample rate never reaches earshot", []( HarnessPerturb& p ) { p.ignoreHostRate = true; } );
+	add( "hostbins", runHostFft, "a host bin's whole energy to every band it touches, not shared", []( HarnessPerturb& p ) { p.hostWholeBin = true; } );
 	add( "devices", runDevices, "menu values are positions, not keys", []( HarnessPerturb& p ) { p.menuByIndex = true; } );
 
 	if( offlineOnly )

@@ -17,6 +17,21 @@ constexpr double kHostRatio     = 3.0;     ///< pattern's: flux over three times
 constexpr double kLogFloorHz    = 20.0;
 } // namespace
 
+void HostAnalyser::binSpan( int j, int count, const HostBins& law, double& lo, double& hi ) noexcept
+{
+	const double nyquist = 0.5 * law.sampleRate;
+	const double n       = (double)std::max( 1, count );
+	const double u0 = (double)j / n, u1 = ( (double)j + 1.0 ) / n;
+	if( law.layout == HostBins::Layout::Log )
+	{
+		lo = kLogFloorHz * std::pow( nyquist / kLogFloorHz, u0 );
+		hi = kLogFloorHz * std::pow( nyquist / kLogFloorHz, u1 );
+		return;
+	}
+	lo = u0 * nyquist;
+	hi = u1 * nyquist;
+}
+
 double HostAnalyser::binHz( int j, int count, const HostBins& law ) noexcept
 {
 	const double nyquist = 0.5 * law.sampleRate;
@@ -24,6 +39,12 @@ double HostAnalyser::binHz( int j, int count, const HostBins& law ) noexcept
 	if( law.layout == HostBins::Layout::Log )
 		return kLogFloorHz * std::pow( nyquist / kLogFloorHz, u );
 	return u * nyquist;
+}
+
+double HostAnalyser::share( double binLo, double binHi, double bandLo, double bandHi ) noexcept
+{
+	const double overlap = std::min( binHi, bandHi ) - std::max( binLo, bandLo );
+	return overlap > 0.0 && binHi > binLo ? std::min( 1.0, overlap / ( binHi - binLo ) ) : 0.0;
 }
 
 void HostAnalyser::reset() noexcept
@@ -71,18 +92,44 @@ void HostAnalyser::frame( double hostSeconds, const float* bins, int count, cons
 		}
 	}
 
+	// Each bin is shared among the bands its span overlaps, in proportion to
+	// the overlap: the bins are energy over their own spans with almost no
+	// leakage (Arena 7.29.0, AGENTS.md), so a band that lies inside one bin
+	// gets that bin's share of it, and a band narrower than a bin is never
+	// empty. Energy (and with it the level) shares exactly; flux and the
+	// priming level take the same fraction of the bin's magnitude.
 	double energy[ kMaxBands ] = {}, flux[ kMaxBands ] = {}, level[ kMaxBands ] = {};
 	for( int j = 0; j < count; ++j )
 	{
-		const double hz = binHz( j, count, config.hostBins );
+		const double rise = std::max( 0.0, m[ j ] - prev_[ j ] );
+		if( mut.hostCentreOnly )
+		{
+			// The old rule (snapshot 8124191): the whole bin to the band its
+			// centre falls in, nothing to a band between two centres.
+			const double hz = binHz( j, count, config.hostBins );
+			for( int b = 0; b < bandCount_; ++b )
+				if( hz >= bands_[ b ].loHz && hz < bands_[ b ].hiHz )
+				{
+					energy[ b ] += m[ j ] * m[ j ];
+					level[ b ] += m[ j ];
+					flux[ b ] += rise;
+					break;
+				}
+			continue;
+		}
+		double lo = 0.0, hi = 0.0;
+		binSpan( j, count, config.hostBins, lo, hi );
 		for( int b = 0; b < bandCount_; ++b )
-			if( hz >= bands_[ b ].loHz && hz < bands_[ b ].hiHz )
-			{
-				energy[ b ] += m[ j ] * m[ j ];
-				level[ b ] += m[ j ];
-				flux[ b ] += std::max( 0.0, m[ j ] - prev_[ j ] );
-				break;
-			}
+		{
+			double f = share( lo, hi, bands_[ b ].loHz, bands_[ b ].hiHz );
+			if( f <= 0.0 )
+				continue;
+			if( mut.hostWholeBin )
+				f = 1.0;
+			energy[ b ] += f * m[ j ] * m[ j ];
+			level[ b ] += f * m[ j ];
+			flux[ b ] += f * rise;
+		}
 	}
 
 	double dt = hostSeconds - last_;

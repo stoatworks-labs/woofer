@@ -25,7 +25,7 @@
 #             uploads every frame, every uniform it sets and the GL state it
 #             saves and puts back. Everything but the registration
 #             (PluginEntry.cpp), whose job the page does.
-#   external/earshot   the snapshot at 8124191, unpatched, built as its CMake
+#   external/earshot   the snapshot at 02306da, unpatched, built as its CMake
 #             builds it with EARSHOT_CAPTURE=OFF: src/NoCapture.cpp in place of
 #             miniaudio (Miniaudio.cpp and MiniaudioImpl.cpp are NOT compiled,
 #             and miniaudio.h is never included), so this module has no device

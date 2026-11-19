@@ -24,7 +24,7 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
 	endif()
 endif()
 
-project( earshot VERSION 0.1.0 LANGUAGES C CXX )
+project( earshot VERSION 0.1.1 LANGUAGES C CXX )
 
 option( EARSHOT_CAPTURE     "Build the miniaudio device backend (off: feed() and the host FFT only)" ON )
 option( EARSHOT_BUILD_TOOLS "Build estest and the consumer smoke test" ${EARSHOT_TOP_LEVEL} )

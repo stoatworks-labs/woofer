@@ -35,8 +35,9 @@ That is all. What it brings with it:
   project.
 
 Windows: the CMake carries `/utf-8 /W4 /permissive-` and `NOMINMAX` for
-MSVC, but **earshot has never been compiled with MSVC**. Expect to be the
-first.
+MSVC. earshot's CI builds it there with no warnings and passes every check
+(windows-2022, x64), and needle's Windows CI builds it inside a plugin DLL.
+No Windows audio device has ever been opened through it.
 
 ## The calls
 
@@ -149,10 +150,25 @@ counts, in fixed buffers (it never allocates).
 On the host fallback (`Source::Host`), only band envelopes and onsets
 exist. Pitch, partials, thirds, tempo, stereo and the tap are empty
 (`valid` false, counts 0), on purpose: draw nothing rather than a guess.
-The host bins' law is an assumption you should expose as parameters
-(`Config::hostBins`: Magnitude or Power, Linear or Log, and the sample
-rate). Under the Linear law at 44.1 kHz the lowest band (30-150 Hz) gets no
-bin at all: 64 linear bins start at 172 Hz.
+
+The host bins' law is `Config::hostBins`. The defaults are what Arena 7.29.0
+was measured to send on a Mac (2026-11-19; AGENTS.md, "Resolume's 64 bins,
+measured"): Magnitude, Linear, and 48 kHz. That gives 64 bins of 375 Hz from
+0 to 24 kHz.
+
+- **The axis follows the host's audio engine rate**, not the clip's. Set
+  `hostBins.sampleRate` from FFGL `SetSampleRate` (CFFGLPlugin's
+  `sampleRate`) when the host sends one.
+- **Keep the law a parameter if you already expose one.** One host on one
+  machine is measured, not every host.
+- **A bin is shared between the bands it overlaps**, in proportion to the
+  overlap, so no band is left empty. Bin 0 holds everything from 0 to
+  375 Hz, kick and bass together.
+  - A 40-160 Hz band gets 0.32 of bin 0's energy.
+  - It gets a matching share of bin 0's level and of its rise.
+- earshot `8124191` and earlier gave each bin to the band that holds its
+  centre (172 Hz at the old 44.1 kHz default). A band narrower than a bin,
+  or one below bin 0's centre, got nothing. Take a newer snapshot.
 
 ## Results worth knowing about
 
@@ -172,3 +188,59 @@ bin at all: 64 linear bins start at 172 Hz.
   1.6 ms plus however long you wait to read it.
 - `readTap`'s queue holds 65536 samples (8.2 s at 8 kHz); anything older is
   dropped and counted in `Frame::tapDropped`.
+
+## Taking a snapshot
+
+The fleet's plugins vendor earshot as a snapshot rather than a submodule: one
+commit of `github.com/stoatworks-labs/earshot`, unpacked with `git archive`
+into `external/earshot/` and never edited there, with a `SNAPSHOT` file beside
+it that names the commit:
+
+```
+earshot snapshot for <plugin>
+
+Source:   https://github.com/stoatworks-labs/earshot
+Commit:   <sha> (<its subject line>)
+Taken:    <date>, with `git archive <sha>`, unmodified.
+Patches:  none.
+
+Do not edit files here; change earshot upstream and take a new snapshot.
+```
+
+earshot has no tags and no releases: a commit on `main` whose CI is green is
+the unit a plugin takes. To change earshot for a plugin, change it here, push,
+and take a new snapshot.
+
+## Crediting earshot
+
+A plugin owes two credits for it, and the fleet's attributions pipeline
+(`stoatworks-backend/scripts/sync-attributions.py`) makes them the way it
+makes every other:
+
+- **miniaudio**, which arrives inside the snapshot, is detected. A repo with
+  `external/earshot/third_party/miniaudio` gets the `miniaudio_earshot` row
+  ("miniaudio, inside earshot") in its generated `ATTRIBUTIONS.md` with
+  nothing to add by hand.
+- **earshot itself** is fleet code carried into another repo, so it is a
+  `code` row in the plugin's own entry in
+  `stoatworks-backend/attributions/derived.json`. Copy this one unchanged; the
+  name must stay `earshot`, because the website gathers code credits by name:
+
+```json
+{
+  "name": "earshot",
+  "author": "Stoatworks earshot",
+  "url": "https://github.com/stoatworks-labs/earshot",
+  "licence": "MIT",
+  "holder": "Stoatworks Labs",
+  "what": "external/earshot/ is earshot, the fleet's shared audio front end, as a snapshot: one commit taken with git archive and left unmodified, named in external/earshot/SNAPSHOT. It is built into the plugin by add_subdirectory and supplies the capture device, chosen by name with a Silent state, and the audio analysis the plugin reads every frame. It brings miniaudio with it, credited below."
+}
+```
+
+Then run the backend's `sync-attributions.py --only <slug>`. It warns when a
+repo vendors earshot and its entry has no row with this URL.
+
+The licences: earshot is MIT with the fleet's holder, Stoatworks Labs, the
+same terms and holder as every MIT plugin, so the plugin's own `LICENSE`
+already carries its notice. miniaudio is the Unlicense or MIT-0, at your
+choice, and asks for no notice at all. The credits are given anyway.

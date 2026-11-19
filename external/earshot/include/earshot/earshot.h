@@ -4,14 +4,14 @@
 	earshot -- a shared live-audio front end for Stoatworks FFGL plugins.
 
 	FFGL gives a plugin one audio input, `FF_USAGE_FFT`: 64 magnitude bins of a
-	mono sum, no phase, no channels, no time domain, with a bin law nobody has
-	measured. earshot opens its own capture device (miniaudio, lifted from
+	mono sum, no phase, no channels, no time domain, refreshed about 23 times a
+	second (Resolume's law, measured in Arena 7.29.0: HostBins below). earshot opens its own capture device (miniaudio, lifted from
 	spasis) and turns it into the things the fleet's audio-reactive plugins
 	actually need: a pitch with a confidence, the strongest partials, onsets
 	per band that are primed on the first frame, band envelopes, an ISO 266
 	third-octave bank, a tempo, a stereo pair, and a contiguous waveform tap.
 	With no device chosen it falls back to Resolume's FFT for band envelopes and
-	onsets only, with the bin law exposed as an assumption.
+	onsets only, with the bin law exposed as configuration.
 
 	## The calls a plugin makes
 
@@ -66,7 +66,7 @@ namespace earshot
 
 constexpr int kVersionMajor = 0;
 constexpr int kVersionMinor = 1;
-constexpr int kVersionPatch = 0;
+constexpr int kVersionPatch = 1;
 
 constexpr int kMaxChannels   = 8;      ///< channels a device stream may carry into the ring
 constexpr int kMaxBands      = 8;      ///< envelope / onset bands
@@ -139,20 +139,37 @@ float deviceKey( const char* name ) noexcept;
 //---------------------------------------------------------------------------
 
 /**
-	Nobody in the fleet has measured Resolume's 64 bins: magnitude or power,
-	linear or log in frequency, what sample rate, what full scale. So the
-	fallback path takes the law as an assumption the plugin exposes (needle's
-	`Bin Law`, pattern's `Bin Law` and `Bin Value`), and nothing it reports is
-	calibrated: `Frame::calibrated` is false and levels are relative.
+	The law of the host's bins. The defaults are Resolume's, measured in Arena
+	7.29.0 on macOS with sine steps, a level ladder and noise played on a layer
+	(AGENTS.md, "Resolume's 64 bins, measured"): **magnitude** (a 6 dB step
+	doubles a bin, linear from 0 to -60 dBFS), **linear** in frequency, bin j
+	spanning [j, j+1)/64 of the Nyquist frequency of Arena's **audio engine
+	rate** (48 kHz there, so 375 Hz a bin, 0-24 kHz; a 44.1 kHz clip is
+	resampled to it), each bin the sum of the magnitudes of the finer FFT bins
+	inside its span, with almost no leakage outside it. The mono sum is
+	(L + R) / 2. A sine of amplitude A reads about A / 4 in its bin.
+
+	A plugin should set `sampleRate` from the host's FFGL SetSampleRate (Arena
+	sends its engine rate) where it has it; 48 kHz is the measured default.
+	The law stays configuration (needle's `Bin Law`, pattern's `Bin Law` and
+	`Bin Value`), since other hosts and other Arena versions are unmeasured,
+	and nothing on this path is calibrated: `Frame::calibrated` is false and
+	levels are relative.
+
+	**A bin is shared among the bands its span overlaps**, each band taking
+	the fraction of the span it covers (energy by that fraction; flux and the
+	priming level by the same fraction of the magnitude). So a band narrower
+	than a bin, or lying inside one, gets its share and is never left empty
+	while the bins cover its range.
 */
 struct HostBins
 {
 	enum class Value : int { Magnitude, Power };
 	enum class Layout : int { Linear, Log };
 
-	Value  value      = Value::Magnitude;
-	Layout layout     = Layout::Linear;   ///< Linear: bin j covers [j, j+1)/N of Nyquist
-	double sampleRate = 44100.0;          ///< the host never says; 44.1 kHz like pattern
+	Value  value      = Value::Magnitude; ///< measured: magnitude
+	Layout layout     = Layout::Linear;   ///< measured: Linear, bin j spans [j, j+1)/N of Nyquist
+	double sampleRate = 48000.0;          ///< the host's audio engine rate (FFGL SetSampleRate); 48 kHz measured
 };
 
 //---------------------------------------------------------------------------

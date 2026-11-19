@@ -16,8 +16,10 @@ namespace
 {
 BackendFactory g_factory = nullptr;
 
-/// The fallback's bands: edges in Hz. Linear 64 bins at 44.1 kHz put bin 0
-/// (172 Hz at its centre) in the first band.
+/// The fallback's bands: edges in Hz. Resolume's 64 linear bins are 375 Hz
+/// each at 48 kHz (Arena 7.29.0, measured): the first band takes 180/375 of
+/// bin 0, the second the rest of bin 0 above 200 Hz, bin 1 and 50/375 of
+/// bin 2, and so on, each bin shared by overlap (earshot 0.1.1).
 constexpr float kBandEdges[ 5 ] = { 20.0f, 200.0f, 800.0f, 3200.0f, 12800.0f };
 constexpr int kBands            = 4;
 /// Most samples one frame takes from the tap (a second); older ones go.
@@ -122,6 +124,14 @@ void AudioInput::Select( float value )
 	diag::info( "audio input: " + ( name.empty() ? std::string( "host FFT" ) : name ) );
 }
 
+void AudioInput::SetHostRate( unsigned int rate )
+{
+	if( ignoreHostRate || rate < 8000 || rate > 768000 || rate == hostRate )
+		return;
+	hostRate = rate;
+	diag::info( "host audio at " + std::to_string( rate ) + " Hz: Resolume's FFT bins are " + std::to_string( rate / 128u ) + " Hz each" );
+}
+
 const earshot::Frame& AudioInput::Frame() const
 {
 	return engine->frame();
@@ -145,15 +155,21 @@ void AudioInput::Feed( const float* interleaved, int frames, int rate, int chann
 int AudioInput::Pull( double hostSeconds, double dt, const float* bins, int binCount, Channel channel, FftLaw law, double volts,
                       std::vector< float >& out )
 {
-	if( static_cast< int >( law ) != appliedLaw )
+	//The law and the host's rate in ONE configure: earshot applies a pending
+	//config at the next update and config() is the applied one, so two
+	//configures in a frame would leave only the second.
+	if( static_cast< int >( law ) != appliedLaw || hostRate != appliedRate )
 	{
 		earshot::Config c       = engine->config();
 		const bool power        = law == FftLaw::LinearPower || law == FftLaw::LogPower;
 		const bool logarithmic  = law == FftLaw::LogMagnitude || law == FftLaw::LogPower;
 		c.hostBins.value        = power ? earshot::HostBins::Value::Power : earshot::HostBins::Value::Magnitude;
 		c.hostBins.layout       = logarithmic ? earshot::HostBins::Layout::Log : earshot::HostBins::Layout::Linear;
+		if( hostRate != 0 )
+			c.hostBins.sampleRate = static_cast< double >( hostRate );
 		engine->configure( c );
-		appliedLaw = static_cast< int >( law );
+		appliedLaw  = static_cast< int >( law );
+		appliedRate = hostRate;
 	}
 
 	const earshot::Frame& f = engine->update( hostSeconds, bins, binCount );

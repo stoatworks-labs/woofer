@@ -4,21 +4,26 @@ The command reference is `CLAUDE.md`. This file is the reasoning: the
 decisions, what was measured to make them, and the traps. Read it before you
 change a detector, a constant, or a tolerance in `estest`.
 
-Status, 2026-11-16: a local library repo (`~/dev/earshot`), intended home
-`github.com/stoatworks-labs/earshot`, never pushed. No plugin uses it yet.
-Everything below was measured by `estest` on synthetic signals on one Apple
-Silicon Mac (macOS 26.4), plus pattern's release-video soundtrack for the
-tempo. **MSVC has never compiled it**, and **live capture has never been
-exercised**, from a host or otherwise: the miniaudio backend has enumerated
-this Mac's 11 capture devices (`estest --devices`, names, channel counts and
-distinct keys, no stream opened) and has never opened a stream. Everything
-about the device worker was checked against a scripted backend that stands
-in for the OS.
+Status, 2026-11-19: public at `github.com/stoatworks-labs/earshot` (it was a
+local repo, `~/dev/earshot`, until then), with no tags or releases: plugins
+vendor a commit as a snapshot, so `main`'s history is never rewritten
+(eight plugins cite `8124191`; README, "Used by"). On 2026-11-19 the host
+bins Arena sends were measured (below), and the fallback stopped leaving a
+band empty: version 0.1.1. Everything below was measured by `estest` on synthetic
+signals on one Apple Silicon Mac (macOS 26.4), plus pattern's release-video
+soundtrack for the tempo; CI (`.github/workflows/ci.yml`) runs the same
+harness, negatives included, on Windows x64 under MSVC, on an Intel Mac and
+on an arm64 Mac, and all of it passed on the first run (2026-11-18, run
+44225830323). **Live capture has never been exercised**, from a host or
+otherwise: the miniaudio backend has enumerated this Mac's 11 capture
+devices (`estest --devices`, names, channel counts and distinct keys, no
+stream opened) and has never opened a stream. Everything about the device
+worker was checked against a scripted backend that stands in for the OS.
 
 ## What it is for
 
-FFGL gives a plugin one audio input: `FF_USAGE_FFT`, 64 bins of a mono sum
-with an unmeasured law. The fleet keeps reinventing what that cannot give it:
+FFGL gives a plugin one audio input: `FF_USAGE_FFT`, 64 bins of a mono sum,
+375 Hz each on Arena (measured, below). The fleet keeps reinventing what that cannot give it:
 spasis (a stereo scope) opened its own miniaudio device; pattern needed onsets
 that hear the first beat and a tempo at the right metre; needle needs a
 third-octave bank whose low bands are 6 Hz wide; woofer needs the waveform
@@ -71,9 +76,28 @@ author's guide.
 Band envelopes and onsets only. Pitch, partials, thirds, tempo, stereo and
 the tap stay EMPTY (spasis's rule: a plausible guess is worse than an empty
 display; the `fallbackInventsPitch` control fails `fallback.empty`). The bin
-law is `Config::hostBins`, an assumption the plugin exposes (needle's and
-pattern's `Bin Law`, pattern's `Bin Value`): Magnitude or Power, Linear or
-Log, and a sample rate, 44.1 kHz unless the plugin says otherwise. The
+law is `Config::hostBins`: Magnitude or Power, Linear or Log, and a sample
+rate. The defaults are Arena's measured law (Magnitude, Linear, 48 kHz).
+It stays configurable, because one host on one Mac was measured; woofer and
+rubens expose it as `FFT Law`.
+
+**Each bin is shared between the bands it overlaps, by the overlap
+fraction.** A bin spans [lo, hi) under the law (`HostAnalyser::binSpan`).
+A band gets f = overlap / (hi - lo) of it (`share`): f m^2 of its energy,
+f m of its level and f of its rise. The fractions over all bands sum to the
+part of the bin inside some band, so the energy is conserved, never
+counted twice (`fallback.share`). A band narrower than a bin gets a share
+in proportion to its width. That is what a flat spectrum under the bin
+would give, and the only thing 64 numbers can say about it.
+
+`8124191` gave each bin whole to the band that held its centre. Bin 0's
+centre is 172 Hz at 44.1 kHz and 187.5 Hz at the measured 48 kHz, so a
+40-160 Hz band got no bin and its onsets never fired. That rule is the
+`hostCentreOnly` control, and it fails `fallback.narrow`, `fallback.inside`,
+`fallback.cover` and `fallback.law`. Giving every touched band the whole bin
+(`hostWholeBin`) fails `fallback.share` and `fallback.law`.
+
+The
 onsets are pattern v0.1.1's linear flux against 3x an adaptive floor,
 primed on frame one with the floor at an eighth of the band level, with
 crossing semantics; a repeated host time (dt = 0) moves nothing, and a host
@@ -82,6 +106,67 @@ clock jump over 1 s re-primes.
 Used when no device is chosen (Closed), and while a chosen one is Opening,
 Missing or Failed if `fallbackWhenDeviceDown`. **Never while Silent**: a
 Silent device is open, and the operator must see that it is dead.
+
+### Resolume's 64 bins, measured
+
+**Where it was measured:** Arena 7.29.0 on this Mac, on 2026-11-19, with the
+audio engine at 48 kHz.
+
+**The probe:** SW Hostprobe (`~/Projects/resolume/hostprobe`) logged the
+`FF_USAGE_FFT` buffer once a frame, at about 88 fps.
+- It sat on an opaque card on layer 2 with Audio = Composition.
+- Layer 1 played generated WAVs: 130 segments of tones, levels, stereo
+  cases, noise and bursts, at 48 kHz, plus a 44.1 kHz file.
+
+**Layout: linear, 375 Hz a bin, 0-24 kHz.** Bin j is [j, j+1) x 375 Hz,
+1/64 of the Nyquist of the engine's 48 kHz.
+- Every sixth-octave tone from 20 Hz to 20.5 kHz peaks in bin
+  floor(f / 375): 2 kHz in 5, 5 kHz in 13, 10 kHz in 26, 20.48 kHz in 54.
+- The 44.1 kHz file reads the same bins (10 kHz in 26, not 29). The axis
+  follows the engine rate, which FFGL `SetSampleRate` reports (48000), not
+  the clip's rate.
+- The Log layout matches nothing measured. It stays as an option for
+  another host.
+
+**Grouping (inferred).** A tone on a bin boundary (375, 1125 or 1500 Hz)
+splits 0.334 : 1 between the two bins, and the boundary bin reads 0.75 of a
+whole tone. Leakage into neighbouring bins is -45 to -70 dB. That fits each
+bin being the sum of the magnitudes of 16 fine bins of a 2048-point Hann
+FFT; it was not seen directly.
+
+**Value: magnitude, linear in amplitude.**
+- 1 kHz from 0 to -60 dBFS reads 0.2627 down to 0.0002627: exactly x1000
+  over 60 dB, with no knee and no ceiling.
+- A 6 dB step is x1.995, so the value is not power.
+- A sine of amplitude A reads 0.25-0.263 A in its bin.
+
+**Channels:** mono, (L + R) / 2. Left alone reads half; left against
+inverted right reads exactly 0.
+
+**Silence:** exactly 0.
+
+**Timing:**
+- The buffer changes about every 43 ms (23 a second; white noise median
+  0.0433 s, which is 2048 samples at 48 kHz).
+- It is held between changes, with no smoothing.
+- A tone's onset and offset are each one update's step; a 20 ms burst shows
+  in one or two updates.
+
+**White noise:** flat across the bins (power centroid 31.7 of 63).
+
+**Not settled:**
+- Whether `FFTInputGain` (24 in Arena's config.xml) scales the bins. It was
+  not changed, because it is the owner's audio setting. The 0.25 scale
+  suggests it is not applied, but that is inference.
+- Windows, other Arena versions and Avenue were not measured.
+
+Arena's `Beat 001.wav` (the drum loop in its media folder) reads, in bin 0:
+mean 0.0199, peak 0.109.
+- Bins 1-11: means 0.002-0.0046, peaks 0.02-0.04.
+- Bins 12-63: mean 0.00204, peak 0.041.
+
+A kick lives in bin 0 with the bass and the low toms. 64 linear bins cannot
+separate them, so on the host path a 40-160 Hz band is a share of 0-375 Hz.
 
 ### Pitch: MPM, two passes
 
@@ -251,7 +336,8 @@ the check in `tools/estest/Check*.cpp`. The kinds:
 
 ## Known limits
 
-- **White noise fires about one onset per 12 s** in the 30-150 Hz band, at
+- **White noise fires about one onset per 12 s** in the 30-150 Hz band (on a
+  device, not the host path), at
   both rates: three bins whose log flux is a sum of differences of
   chi-square variables, a tail that reaches mean + 12 MAD once in a few
   thousand hops. Tonal and mixed material fires none. `onset.steady` allows
@@ -263,25 +349,38 @@ the check in `tools/estest/Check*.cpp`. The kinds:
 - **A device that stops calling back without reporting it** stays Running:
   Silent counts zeros delivered, and a stalled device delivers nothing.
   Nothing in the harness covers a stall.
-- **Under the Linear host-bin law the 30-150 Hz band gets no bin at all**
-  (bin 0's centre is 172 Hz at 44.1 kHz). That is the honest answer for 64
-  linear bins; the Log law gives it bins.
+- **On the host path everything below 375 Hz is one number** (bin 0, as
+  measured). A 40-160 Hz band reads 0.32 of bin 0's energy, so it rises and
+  fires with whatever is loudest down there (a kick, a bass note, a low
+  tom), and a band's level is a share of a bin, not a measurement of the
+  band. Only a device separates them.
 - **update() cost**: mean 0.6 ms on this Mac for a 60 fps frame of 48 kHz
   stereo with everything on; one run on a loaded machine saw a 5.3 ms frame.
   The tempo detection runs once per audio second (~1 ms).
-- MSVC never compiled. The code avoids the known traps (no M_PI, no VLAs, no
-  GCC attributes outside the consumer test, `/utf-8 /permissive-` set), but
-  that is a statement of intent, not a result.
+- MSVC: needle's Windows CI first compiled the library (needle `e512e2b`), and
+  this repo's CI builds the library at `/W4 /permissive-` and the harness with
+  no warnings, and passes every check, negative control and the consumer DLL
+  on windows-2022. What avoided the known traps: no M_PI (src/Dsp.h's own
+  constants), no VLAs, no GCC attributes outside the consumer test, `/utf-8`,
+  `NOMINMAX`, and no `<windows.h>` in any file that names a variable `far`
+  (tools/estest/CheckOnsets.cpp has one). No Windows device has ever been
+  listed or opened: the runner's `estest --devices` lists none, and
+  `listDevices()` returns an empty list whether the context failed or there
+  are no inputs, so that proves nothing about WASAPI.
+- The macOS arm64 runner lists two capture devices of its own ("Apple Virtual
+  Sound Device", the default, and "Null Audio Device"); CI only enumerates
+  them. They are a possible place for a live-capture test that needs no
+  microphone; nothing uses them yet.
 
 ## Negative controls and the mutation test
 
-`estest --negative`: 50 `Mutations` flags (include/earshot/testing.h) in 51
+`estest --negative`: 52 `Mutations` flags (include/earshot/testing.h) in 53
 cases, each a bug the fleet shipped, a design this repo rejected, or a
 classic slip (biquads in float, a float twiddle recurrence, an allocation
 per frame, a device swapped for the default); every check a case targets
-must FAIL in every cell. All 51 are caught. The run begins with every group
-unmutated and ends with coverage: each of the 65 checks must pass unmutated
-and be the target of a caught case, or `--negative` fails. All 65 are.
+must FAIL in every cell. All 53 are caught. The run begins with every group
+unmutated and ends with coverage: each of the 69 checks must pass unmutated
+and be the target of a caught case, or `--negative` fails. All 69 are.
 
 Two controls are weaker than the rest, and say so:
 
@@ -308,6 +407,16 @@ each built in a scratch copy; estest must fail. Fifteen of fifteen killed.
 
 ## Traps
 
+- **A bin is not its centre.** `8124191` filed each host bin under the band
+  holding its centre. Its checks only asked about bands that held a centre,
+  and the empty 30-150 Hz band was written down as a known limit instead of
+  a bug. A band narrower than a bin, or below bin 0's centre, got nothing:
+  snowglobe's Kick never fired in Arena (0 of 69 snapshot pairs). Check a
+  narrow band, a band inside one bin, and random plans (`fallback.narrow`,
+  `fallback.inside`, `fallback.cover`).
+- **Arena stops calling an effect for about 5 s every 62 s**, while it shows
+  its logo overlay. A probe log has a hole there that says nothing about the
+  bins.
 - **Wall time measures the scheduler.** `capture.slowopen` limited
   `update()` to 5 ms; on this shared Mac, with other builds and a release
   running, one update took 31 ms, and the check failed twice in a day (once

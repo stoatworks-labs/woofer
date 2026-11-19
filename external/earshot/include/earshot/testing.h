@@ -96,6 +96,8 @@ struct Mutations
 	bool fallbackInventsPitch = false; ///< host path fills pitch from the loudest bin
 	bool fallbackOnSilent   = false; ///< host bins stand in for a Silent device too (hiding it)
 	bool hostPowerAsMagnitude = false; ///< Power-law bins used as magnitudes (not square-rooted)
+	bool hostCentreOnly     = false; ///< a host bin goes whole to the band holding its centre (8124191's rule)
+	bool hostWholeBin       = false; ///< a host bin's whole energy to every band it touches, not shared
 };
 
 /// What a backend calls while a device runs. Engine owns it.

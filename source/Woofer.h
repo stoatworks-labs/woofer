@@ -9,6 +9,7 @@
 // After FFGLSDK.h, which is where FFUInt32 comes from.
 #include "StoatworksAboutParams.h"
 
+#include <atomic>
 #include <vector>
 
 namespace woofer
@@ -38,6 +39,10 @@ public:
 	/// -- so without this no real host can load the plugin.
 	FFResult SetTextParameter( unsigned int index, const char* value ) override;
 	FFResult SetTime( double time ) override;
+	/// The host's audio engine rate: the axis of its FFT buffer (earshot's
+	/// AGENTS.md, "Resolume's 64 bins, measured"). Arena sends 48000. Kept
+	/// here and handed to earshot on the render thread, in Advance.
+	void SetSampleRate( unsigned int rate ) override;
 
 	//-------------------------------------------------------------------
 	// For the harness. Nothing in the plugin's own operation calls these.
@@ -160,6 +165,10 @@ private:
 	bool settledJump    = false;
 	double now          = 0.0;
 	double lastNow      = -1.0;
+	/// SetSampleRate's, 0 until the host sends one. Atomic: a host may call
+	/// SetSampleRate from another thread than the frame's. (The SDK's own
+	/// `sampleRate` member is never initialised: read this one.)
+	std::atomic< unsigned int > hostRate { 0 };
 
 	bool rescanHeld   = false;
 	int hooks         = 0;

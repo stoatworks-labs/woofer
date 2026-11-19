@@ -469,11 +469,27 @@ void checkParams( Report& rep, const Run& run, const Mutations& mut )
 //   nothing.) Negative control: dt = 0 snaps the floor (the fleet's bug).
 // fallback.gap -- the host clock jumps 2 s (a pause) and the spectrum has
 //   changed: no onset (re-primed), while the same change 1/60 s later fires.
-// fallback.law -- HostBins as documented: bin j's centre is (j + 0.5)/64 of
-//   Nyquist (linear) or 20 Hz * (Nyquist / 20 Hz)^((j + 0.5)/64) (log), and a
-//   single bin's energy lands in the band holding that centre; Power values
-//   are square-rooted. Expected bands computed here from those formulas.
-//   Negative control: Power bins used as magnitudes.
+// fallback.law -- HostBins as documented: bin j spans [j, j+1)/64 of
+//   Nyquist (linear) or 20 Hz * (Nyquist / 20 Hz)^([j, j+1)/64) (log), and a
+//   single bin's energy is shared among the bands its span overlaps, each
+//   getting the overlapped fraction of the span (level^2 = fraction x bin^2,
+//   to 1e-5); Power values are square-rooted. Expected shares computed here
+//   from those formulas. Negative controls: Power bins used as magnitudes;
+//   the whole bin to the band holding its centre (snapshot 8124191's rule).
+// fallback.narrow -- a band narrower than one bin ([200, 300) Hz, no bin
+//   centre inside it) on a flat spectrum: its level is its share of the bin
+//   it lies in, and a jump in that bin fires it on that frame. Negative
+//   control: the centre rule, which leaves it empty and deaf.
+// fallback.inside -- a band inside one bin below that bin's centre
+//   ([40, 160) Hz, the kick band snowglobe and rubens use, inside bin 0 at
+//   either rate): the same. Negative control: the centre rule.
+// fallback.cover -- 300 band plans of 1 to 8 bands, edges log-uniform from
+//   25 Hz to 0.95 x Nyquist, both layouts, on a flat spectrum: no band is
+//   empty. Negative control: the centre rule (most narrow bands empty).
+// fallback.share -- bands that tile the whole spectrum get, between them,
+//   exactly the bins' energy (random spectra, both layouts, to 1e-9): a bin
+//   is shared, never counted twice. Negative control: every band a bin
+//   touches gets all of it.
 // fallback.down -- a named device that is Missing: host bins stand in
 //   (fallbackWhenDeviceDown); with it off, nothing. A Silent device: never the
 //   host (the operator must see the device is dead). Negative control: the
@@ -563,6 +579,28 @@ void checkFallback( Report& rep, const Run& run, const Mutations& mut )
 		rep.add( "fallback.gap", cell, afterGap == 0 && normal > 0, "the same spectrum change after a 2 s host-clock jump: %u onsets (must be 0); after one frame: %u (must be > 0)",
 				 afterGap, normal );
 	}
+	// The documented span of bin j of 64, and a band's share of it, computed
+	// here from the formulas rather than through the library's own helpers.
+	auto span = [ & ]( const Config& c, int j, double& lo, double& hi ) {
+		const double nyq = 0.5 * c.hostBins.sampleRate;
+		const double u0 = j / 64.0, u1 = ( j + 1 ) / 64.0;
+		if( c.hostBins.layout == earshot::HostBins::Layout::Log )
+		{
+			lo = 20.0 * std::pow( nyq / 20.0, u0 );
+			hi = 20.0 * std::pow( nyq / 20.0, u1 );
+		}
+		else
+		{
+			lo = u0 * nyq;
+			hi = u1 * nyq;
+		}
+	};
+	auto shareOf = [ & ]( const Config& c, int j, double bandLo, double bandHi ) {
+		double lo, hi;
+		span( c, j, lo, hi );
+		const double o = std::min( hi, bandHi ) - std::max( lo, bandLo );
+		return o > 0.0 ? o / ( hi - lo ) : 0.0;
+	};
 	{
 		int  wrong = 0, checked = 0;
 		bool powerOk = true;
@@ -570,26 +608,22 @@ void checkFallback( Report& rep, const Run& run, const Mutations& mut )
 		{
 			Config c;
 			c.hostBins.layout = layout ? earshot::HostBins::Layout::Log : earshot::HostBins::Layout::Linear;
-			const double nyq  = 0.5 * c.hostBins.sampleRate;
 			for( int j = 0; j < 64; ++j )
 			{
-				const double u      = ( j + 0.5 ) / 64.0;
-				const double centre = layout ? 20.0 * std::pow( nyq / 20.0, u ) : u * nyq;
-				int          want   = -1;
-				for( int b = 0; b < c.bandCount; ++b )
-					if( centre >= c.bandEdges[ b ] && centre < c.bandEdges[ b + 1 ] )
-						want = b;
 				Engine e( c, nullptr );
 				e.mutations() = mut;
 				float bins[ 64 ] = {};
 				bins[ j ]        = 0.5f;
 				const Frame& f   = e.update( 1.0, bins, 64 );
-				int          got = -1;
-				for( int b = 0; b < f.bandCount; ++b )
-					if( f.bands[ b ].level > 0.0f )
-						got = got == -1 ? b : -2;
+				bool         ok  = f.bandCount == c.bandCount;
+				for( int b = 0; ok && b < c.bandCount; ++b )
+				{
+					const double want = shareOf( c, j, c.bandEdges[ b ], c.bandEdges[ b + 1 ] ) * 0.25;
+					const double got  = (double)f.bands[ b ].level * f.bands[ b ].level;
+					ok                = std::fabs( got - want ) <= 1e-5 * 0.25;
+				}
 				++checked;
-				wrong += got != want ? 1 : 0;
+				wrong += ok ? 0 : 1;
 			}
 		}
 		{
@@ -598,12 +632,133 @@ void checkFallback( Report& rep, const Run& run, const Mutations& mut )
 			Engine e( c, nullptr );
 			e.mutations()     = mut;
 			float  bins[ 64 ] = {};
-			bins[ 0 ]         = 0.25f;   // power 0.25 is magnitude 0.5
+			bins[ 3 ]         = 0.25f;   // power 0.25 is magnitude 0.5; bin 3 lies inside band 2 at 44.1 or 48 kHz
 			const Frame& f    = e.update( 1.0, bins, 64 );
-			powerOk           = std::fabs( f.bands[ 1 ].level - 0.5f ) < 1e-6f;
+			powerOk           = std::fabs( f.bands[ 2 ].level - 0.5f ) < 1e-6f;
 		}
-		rep.add( "fallback.law", cell, wrong == 0 && powerOk, "%d single-bin spectra (linear and log): %d in the wrong band; Power law square-rooted: %s",
+		rep.add( "fallback.law", cell, wrong == 0 && powerOk,
+				 "%d single-bin spectra (linear and log): %d with a band's energy off its share of the bin's span; Power law square-rooted: %s",
 				 checked, wrong, powerOk ? "yes" : "NO" );
+	}
+	{
+		// A band narrower than a bin, and a band inside one bin below its
+		// centre: each must carry its share of a flat spectrum, and hear a
+		// jump in the bin it lies in on the frame it happens.
+		auto oneBand = [ & ]( float lo, float hi, double& level, double& want, int& firedAt, int& jumpAt ) {
+			Config c;
+			c.bandCount      = 3;
+			const float e[ 4 ] = { lo, hi, 4000.0f, 16000.0f };
+			for( int k = 0; k < 4; ++k )
+				c.bandEdges[ k ] = e[ k ];
+			int bin = -1;
+			for( int j = 0; j < 64 && bin < 0; ++j )
+				if( shareOf( c, j, lo, hi ) > 0.0 )
+					bin = j;
+			Engine en( c, nullptr );
+			en.mutations() = mut;
+			float flat[ 64 ];
+			std::fill( flat, flat + 64, 0.1f );
+			jumpAt  = (int)std::lround( 0.5 * run.fps );
+			firedAt = -1;
+			level   = 0.0;
+			want    = 0.0;
+			for( int j = 0; j < 64; ++j )
+				want += shareOf( c, j, lo, hi ) * 0.01;
+			want = std::sqrt( want );
+			for( int i = 0; i < jumpAt + 10; ++i )
+			{
+				float k[ 64 ];
+				std::copy( flat, flat + 64, k );
+				if( i == jumpAt && bin >= 0 )
+					k[ bin ] *= 3.2f;
+				const Frame& f = en.update( 5.0 + i * dt, k, 64 );
+				if( i == jumpAt - 1 )
+					level = f.bands[ 0 ].level;
+				if( firedAt < 0 && f.bands[ 0 ].onset )
+					firedAt = i;
+			}
+		};
+		double level, want;
+		int    firedAt, jumpAt;
+		oneBand( 200.0f, 300.0f, level, want, firedAt, jumpAt );
+		rep.add( "fallback.narrow", cell, want > 0.0 && std::fabs( level - want ) <= 1e-5 * want && firedAt == jumpAt,
+				 "a 100 Hz band ([200, 300) Hz) inside one bin, on a flat spectrum: level %.6f (its share %.6f); a jump in that bin on frame %d, "
+				 "the band fired on frame %d",
+				 level, want, jumpAt, firedAt );
+		oneBand( 40.0f, 160.0f, level, want, firedAt, jumpAt );
+		rep.add( "fallback.inside", cell, want > 0.0 && std::fabs( level - want ) <= 1e-5 * want && firedAt == jumpAt,
+				 "the kick band [40, 160) Hz, inside bin 0 below its centre: level %.6f (its share %.6f); a jump in bin 0 on frame %d, the band "
+				 "fired on frame %d",
+				 level, want, jumpAt, firedAt );
+	}
+	{
+		// No band left empty when the spectrum covers its range.
+		Rng rng{ 11 };
+		int plans = 0, empty = 0, bands = 0;
+		for( int layout = 0; layout < 2; ++layout )
+			for( int p = 0; p < 150; ++p )
+			{
+				Config c;
+				c.hostBins.layout = layout ? earshot::HostBins::Layout::Log : earshot::HostBins::Layout::Linear;
+				const double nyq  = 0.5 * c.hostBins.sampleRate;
+				const int    n    = 1 + (int)( rng.uniform() * 8.0 ) % 8;
+				std::vector< double > edges( (size_t)n + 1 );
+				for( double& x : edges )
+					x = 25.0 * std::pow( 0.95 * nyq / 25.0, rng.uniform() );
+				std::sort( edges.begin(), edges.end() );
+				edges.erase( std::unique( edges.begin(), edges.end() ), edges.end() );
+				if( edges.size() < 2 )
+					continue;
+				c.bandCount = (int)edges.size() - 1;
+				for( size_t k = 0; k < edges.size(); ++k )
+					c.bandEdges[ k ] = (float)edges[ k ];
+				Engine e( c, nullptr );
+				e.mutations() = mut;
+				float flat[ 64 ];
+				std::fill( flat, flat + 64, 0.1f );
+				const Frame& f = e.update( 1.0, flat, 64 );
+				++plans;
+				for( int b = 0; b < f.bandCount; ++b )
+				{
+					++bands;
+					empty += f.bands[ b ].level > 0.0f && f.bands[ b ].loHz < f.bands[ b ].hiHz ? 0 : 1;
+				}
+			}
+		rep.add( "fallback.cover", cell, empty == 0 && plans > 250, "%d random band plans (%d bands, linear and log) on a flat spectrum: %d bands empty (must be 0)",
+				 plans, bands, empty );
+	}
+	{
+		// Bands that tile the spectrum share out exactly the bins' energy.
+		Rng    rng{ 13 };
+		double worst = 0.0;
+		for( int layout = 0; layout < 2; ++layout )
+			for( int p = 0; p < 20; ++p )
+			{
+				Config c;
+				c.hostBins.layout = layout ? earshot::HostBins::Layout::Log : earshot::HostBins::Layout::Linear;
+				const double nyq  = 0.5 * c.hostBins.sampleRate;
+				c.bandCount       = 5;
+				const double lo0  = layout ? 20.0 : 0.0;
+				const float  e[ 6 ] = { (float)lo0, 100.0f, 437.5f, 1000.0f, 7777.0f, (float)nyq };
+				for( int k = 0; k < 6; ++k )
+					c.bandEdges[ k ] = e[ k ];
+				Engine e2( c, nullptr );
+				e2.mutations() = mut;
+				float  bins[ 64 ];
+				double total = 0.0;
+				for( int j = 0; j < 64; ++j )
+				{
+					bins[ j ] = (float)rng.uniform();
+					total += (double)bins[ j ] * bins[ j ];
+				}
+				const Frame& f   = e2.update( 1.0, bins, 64 );
+				double       sum = 0.0;
+				for( int b = 0; b < f.bandCount; ++b )
+					sum += (double)f.bands[ b ].level * f.bands[ b ].level;
+				worst = std::max( worst, std::fabs( sum / total - 1.0 ) );
+			}
+		rep.add( "fallback.share", cell, worst <= 1e-6, "five bands tiling the spectrum, 40 random spectra: the bands' energy against the bins', worst %.2e off (limit 1e-6)",
+				 worst );
 	}
 	{
 		// Missing, through a scripted backend that never finds the device.

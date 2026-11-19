@@ -829,6 +829,9 @@ struct HarnessPerturb
 	bool fallbackFromTap  = false;
 	bool menuByIndex      = false;
 	bool clockAsSeconds   = false;
+	bool ignoreHostRate   = false;///< SetSampleRate never reaches earshot
+	bool hostCentreOnly   = false;///< earshot's mutation: each host bin whole to the band holding its centre (8124191's rule)
+	bool hostWholeBin     = false;///< earshot's mutation: each host bin's whole energy to every band it touches
 };
 
 /// Every negative control onto one plugin.
@@ -839,6 +842,9 @@ void applyPerturb( WooferPlugin& plugin, const HarnessPerturb& hp )
 	plugin.SetResetOnResizeForTest( hp.resetOnResize );
 	plugin.AudioForTest().fallbackFromTap = hp.fallbackFromTap;
 	plugin.AudioForTest().menuByIndex     = hp.menuByIndex;
+	plugin.AudioForTest().ignoreHostRate  = hp.ignoreHostRate;
+	plugin.AudioForTest().Engine().mutations().hostCentreOnly = hp.hostCentreOnly;
+	plugin.AudioForTest().Engine().mutations().hostWholeBin   = hp.hostWholeBin;
 }
 
 /// New tap samples since `seen`, oldest first, from the model's trace.
