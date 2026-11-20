@@ -63,6 +63,15 @@ macOS builds are signed and notarised and open normally. The Windows builds are 
 
 <!-- downloads:end -->
 
+## Video
+
+> **Photosensitivity warning:** the Height view can flash with loud music: it shows the cone's
+> movement as grey across the whole driver, and on a loud track that swings more than three times
+> a second. The video shows only the default Lit view, and large-area flashes in it are kept to
+> three a second or fewer.
+
+[![Woofer: your clip on a real loudspeaker, and the music drives it, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=xohNJxZC2gg)
+
 ## The one idea
 
 **The clip is printed on the front of a loudspeaker, and the music drives the loudspeaker.**
